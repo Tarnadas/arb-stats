@@ -1868,6 +1868,8 @@ dependencies = [
  "futures-util",
  "near-jsonrpc-client",
  "near-primitives",
+ "near-token",
+ "regex",
  "reqwest",
  "serde",
  "serde_json",
@@ -2433,6 +2435,12 @@ name = "near-stdx"
 version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e111e0da22d28d9b7405e86d3314835d9f5ab8036e3580a480177f6d0a329ab9"
+
+[[package]]
+name = "near-token"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b68f3f8a2409f72b43efdbeff8e820b81e70824c49fee8572979d789d1683fb"
 
 [[package]]
 name = "near-vm-compiler"

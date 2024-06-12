@@ -1,6 +1,8 @@
+mod event;
 mod indexer;
 mod send;
 
+pub use event::*;
 pub use indexer::*;
 pub use send::*;
 

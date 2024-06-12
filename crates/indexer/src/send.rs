@@ -5,18 +5,22 @@ use reqwest::{
     header::{HeaderMap, AUTHORIZATION},
     Client, Url,
 };
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::env;
 use tokio_stream::{Stream, StreamExt};
 
-#[derive(Serialize, Deserialize, Debug)]
+use crate::ArbEvent;
+
+#[derive(Debug, Serialize)]
 struct BatchEvent {
     pub block_height: BlockHeight,
     pub timestamp: u64,
-    pub events: Vec<()>,
+    pub events: Vec<ArbEvent>,
 }
 
-pub async fn send_data(stream: impl Stream<Item = (BlockHeight, u64, Vec<()>)>) -> Result<()> {
+pub async fn send_data(
+    stream: impl Stream<Item = (BlockHeight, u64, Vec<ArbEvent>)>,
+) -> Result<()> {
     let mut headers = HeaderMap::new();
     headers.insert(
         AUTHORIZATION,
@@ -39,6 +43,9 @@ pub async fn send_data(stream: impl Stream<Item = (BlockHeight, u64, Vec<()>)>) 
             || block_height - last_block_height >= MAX_BLOCK_HEIGHT_DIFF
         {
             println!("block_height: {}", block_height);
+            if !batch_event.events.is_empty() {
+                println!("found events: {}", batch_event.events.len());
+            }
             last_block_height = block_height;
             match client
                 .post(base_url.join("batch")?)
