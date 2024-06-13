@@ -1869,6 +1869,7 @@ dependencies = [
  "near-jsonrpc-client",
  "near-primitives",
  "near-token",
+ "rayon",
  "regex",
  "reqwest",
  "serde",

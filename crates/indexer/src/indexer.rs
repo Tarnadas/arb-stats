@@ -11,6 +11,7 @@ use near_primitives::{
     views::{ActionView, BlockView, FinalExecutionOutcomeViewEnum, TxExecutionStatus},
 };
 use near_token::NearToken;
+use rayon::prelude::*;
 use regex::Regex;
 use reqwest::{
     header::{HeaderMap, AUTHORIZATION},
@@ -83,13 +84,13 @@ async fn handle_block(
             .await
     }))
     .await?
-    .iter()
+    .par_iter()
     .flat_map(|chunk| {
         chunk
             .transactions
-            .iter()
+            .par_iter()
             .filter(|tx| arb_bots.contains(&tx.signer_id))
-            .flat_map(|tx| {
+            .map(|tx| {
                 tx.actions.iter().filter_map(|action| {
                     if let ActionView::FunctionCall { method_name, .. } = action {
                         if method_name == "swap" {
@@ -102,6 +103,7 @@ async fn handle_block(
                     }
                 })
             })
+            .flatten_iter()
     })
     .collect();
 
@@ -121,7 +123,7 @@ async fn handle_block(
         },
     ))
     .await?
-    .into_iter()
+    .into_par_iter()
     .enumerate()
     .filter_map(|(index, tx)| {
         tx.final_execution_outcome.map(|final_execution_outcome| {
