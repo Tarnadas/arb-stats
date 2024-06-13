@@ -139,9 +139,13 @@ async fn handle_block(
             None
         }
     })
-    .map(|(sender_id, tx_hash, outcome)| {
-        let event = match outcome.status {
+    .filter_map(|(sender_id, tx_hash, outcome)| {
+        match outcome.status {
             near_primitives::views::FinalExecutionStatus::SuccessValue(_) => {
+                if outcome.receipts_outcome[0].outcome.executor_id.as_str() != "v2.ref-finance.near"
+                {
+                    return None;
+                }
                 let amount_in = NearToken::from_yoctonear(
                     swapped_from_regex
                         .captures(&outcome.receipts_outcome[0].outcome.logs[0])
@@ -164,21 +168,20 @@ async fn handle_block(
                         )
                     })
                     .unwrap();
-                ArbStatus::Success(
+                Some(ArbStatus::Success(
                     amount_out
                         .saturating_sub(amount_in)
                         .as_yoctonear()
                         .to_string(),
-                )
+                ))
             }
-            _ => ArbStatus::Failure,
-        };
-
-        ArbEvent {
+            _ => Some(ArbStatus::Failure),
+        }
+        .map(|event| ArbEvent {
             sender_id,
             tx_hash,
             event,
-        }
+        })
     })
     .collect();
 
