@@ -18,8 +18,7 @@ use reqwest::{
     Client, Url,
 };
 use serde::Deserialize;
-use std::{env, str::FromStr, time::Duration};
-use tokio::time::sleep;
+use std::{env, str::FromStr};
 use tokio_stream::Stream;
 
 #[derive(Deserialize)]
@@ -44,24 +43,27 @@ pub async fn poll_block(
 
     Ok(stream! {
         loop {
-            if let Ok(block) = rpc_client
-                .call(methods::block::RpcBlockRequest {
-                    block_reference: BlockReference::BlockId(BlockId::Height(block_height)),
-                })
-                .await
-            {
-                block_height += 1;
-                let timestamp = block.header.timestamp_nanosec;
+            match rpc_client
+            .call(methods::block::RpcBlockRequest {
+                block_reference: BlockReference::BlockId(BlockId::Height(block_height)),
+            })
+            .await {
+                Ok(block) => {
+                    block_height += 1;
+                    let timestamp = block.header.timestamp_nanosec;
 
-                yield (
-                    block_height,
-                    timestamp,
-                    handle_block(block, &arb_bots, &swapped_from_regex, &swapped_to_regex, rpc_client)
-                        .await
-                        .unwrap(),
-                );
-            } else {
-                sleep(Duration::from_millis(100)).await;
+                    yield (
+                        block_height,
+                        timestamp,
+                        handle_block(block, &arb_bots, &swapped_from_regex, &swapped_to_regex, rpc_client)
+                            .await
+                            .unwrap(),
+                    );
+                },
+                Err(err) => {
+                    dbg!(err);
+                    block_height += 1;
+                },
             }
         }
     })
@@ -123,7 +125,7 @@ async fn handle_block(
         },
     ))
     .await?
-    .into_par_iter()
+    .into_iter()
     .enumerate()
     .filter_map(|(index, tx)| {
         tx.final_execution_outcome.map(|final_execution_outcome| {

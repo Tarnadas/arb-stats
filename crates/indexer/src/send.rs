@@ -43,11 +43,9 @@ pub async fn send_data(
 
         if block_height - last_block_height >= max_block_height_diff {
             println!("block_height: {}", block_height);
-            if !batch_event.is_empty() {
-                println!(
-                    "found events: {}",
-                    batch_event.iter().map(|ev| ev.events.len()).sum::<usize>()
-                );
+            let event_size = batch_event.iter().map(|ev| ev.events.len()).sum::<usize>();
+            if event_size > 0 {
+                println!("found events: {}", event_size);
             }
             last_block_height = block_height;
             match client
