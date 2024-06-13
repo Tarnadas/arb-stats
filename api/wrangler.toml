@@ -14,8 +14,9 @@ routes = [
 bindings = [
   { name = "INFO", class_name = "Info" },
   { name = "BOTS", class_name = "Bots" },
+  { name = "BOT_IDS", class_name = "BotIds" },
 ]
 
 [[migrations]]
 tag = "v1"
-new_classes = ["Info", "Bots"]
+new_classes = ["Info", "Bots", "BotIds"]

@@ -30,8 +30,8 @@ pub async fn send_data(
     let base_url = Url::parse(&env::var("API_BASE_URL")?)?;
     pin_mut!(stream);
 
-    let mut last_block_height = 0;
-    const MAX_BLOCK_HEIGHT_DIFF: BlockHeight = 500;
+    let mut last_block_height = env::var("START_BLOCK_HEIGHT")?.parse()?;
+    let max_block_height_diff: BlockHeight = env::var("MAX_BLOCK_HEIGHT_DIFF")?.parse()?;
     let mut batch_event = vec![];
     while let Some((block_height, timestamp, events)) = stream.next().await {
         let block_event = BlockEvent {
@@ -41,7 +41,7 @@ pub async fn send_data(
         };
         batch_event.push(block_event);
 
-        if block_height - last_block_height >= MAX_BLOCK_HEIGHT_DIFF {
+        if block_height - last_block_height >= max_block_height_diff {
             println!("block_height: {}", block_height);
             if !batch_event.is_empty() {
                 println!(
@@ -66,6 +66,7 @@ pub async fn send_data(
                     );
                 }
             }
+            batch_event.clear();
         }
     }
 

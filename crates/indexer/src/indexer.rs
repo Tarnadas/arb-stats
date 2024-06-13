@@ -104,7 +104,6 @@ async fn handle_block(
             })
     })
     .collect();
-    dbg!(tx_hashes.len());
 
     let events = try_join_all(tx_hashes.iter().cloned().map(
         |(tx_hash, sender_account_id)| async move {

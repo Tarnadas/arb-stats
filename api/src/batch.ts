@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { bearerAuth } from 'hono/bearer-auth';
 
 import { Arbitrage, zodBatchEvent } from './events';
+import { InfoResult } from './info';
 
 export const batch = new Hono();
 batch
@@ -19,66 +20,94 @@ batch
     async c => {
       const batchEvents = c.req.valid('json');
 
-      for (const batchEvent of batchEvents) {
-        console.info(
-          `[${new Date().toLocaleString()}] block_height ${batchEvent.blockHeight}`
+      const blockHeight = batchEvents[batchEvents.length - 1].blockHeight;
+      console.info(
+        `[${new Date().toLocaleString()}] block_height ${blockHeight}`
+      );
+
+      const infoAddr = c.env.INFO.idFromName('');
+      const infoStub = c.env.INFO.get(infoAddr);
+      const botIdsAddr = c.env.BOT_IDS.idFromName('');
+      const botIdsStub = c.env.BOT_IDS.get(botIdsAddr);
+
+      const res = await infoStub.fetch(`${new URL(c.req.url).origin}`);
+      const { lastBlockHeight } = await res.json<InfoResult>();
+
+      if (blockHeight <= lastBlockHeight) {
+        console.info('clearing old data...');
+        const res = await botIdsStub.fetch(`${new URL(c.req.url).origin}`);
+        const botIds = await res.json<string[]>();
+        await Promise.all(
+          botIds.map(botId => {
+            const addr = c.env.BOTS.idFromName(botId);
+            const obj = c.env.BOTS.get(addr);
+            return obj.fetch(`${new URL(c.req.url).origin}`, {
+              method: 'DELETE'
+            });
+          })
         );
+        console.info('clearing finished');
+      }
 
-        const infoAddr = c.env.INFO.idFromName('');
-        const infoStub = c.env.INFO.get(infoAddr);
-        const botsAddr = c.env.BOTS.idFromName('');
-        const botsStub = c.env.BOTS.get(botsAddr);
+      await infoStub.fetch(`${new URL(c.req.url).origin}/last_block_height`, {
+        method: 'POST',
+        body: String(blockHeight)
+      });
 
-        await infoStub.fetch(`${new URL(c.req.url).origin}/last_block_height`, {
-          method: 'POST',
-          body: String(batchEvent.blockHeight)
-        });
-
-        const allSenders = new Set<string>();
+      const allSenders = new Set<string>();
+      for (const batchEvent of batchEvents) {
         for (const event of batchEvent.events) {
           allSenders.add(event.senderId);
         }
+      }
+      await botIdsStub.fetch(`${new URL(c.req.url).origin}`, {
+        method: 'POST',
+        body: JSON.stringify(Array.from(allSenders))
+      });
 
-        for (const senderId of allSenders) {
-          const successEvents = batchEvent.events
-            .filter(event => event.senderId === senderId)
-            .filter(event => event.status === 'success')
-            .map(
-              event =>
-                ({
-                  senderId: event.senderId,
-                  txHash: event.txHash,
-                  profit: (event as Arbitrage).profit
-                }) as Arbitrage
-            );
-
-          try {
-            await new Promise<void>((resolve, reject) => {
-              console.info(successEvents);
-
-              awaitResponse(
-                botsStub.fetch(
-                  `${new URL(c.req.url).origin}/${encodeURI(senderId)}`,
-                  {
-                    method: 'POST',
-                    body: JSON.stringify(successEvents)
-                  }
-                ),
-                reject
-              )
-                .then(resolve)
-                .catch(reject);
-            });
-          } catch (err) {
-            if (err instanceof Response) {
-              return err;
-            } else {
-              console.error(`Unexpected error: ${err}`);
-            }
-          }
-
-          // TODO track gas fee for failure
+      for (const senderId of allSenders) {
+        const successEvents = batchEvents
+          .flatMap(({ events }) => events)
+          .filter(event => event.senderId === senderId)
+          .filter(event => event.status === 'success')
+          .map(
+            event =>
+              ({
+                senderId: event.senderId,
+                txHash: event.txHash,
+                profit: (event as Arbitrage).profit
+              }) as Arbitrage
+          );
+        if (successEvents.length === 0) {
+          continue;
         }
+
+        try {
+          await new Promise<void>((resolve, reject) => {
+            console.info(successEvents);
+
+            const botsAddr = c.env.BOTS.idFromName(senderId);
+            const botsStub = c.env.BOTS.get(botsAddr);
+
+            awaitResponse(
+              botsStub.fetch(`${new URL(c.req.url).origin}`, {
+                method: 'POST',
+                body: JSON.stringify(successEvents)
+              }),
+              reject
+            )
+              .then(resolve)
+              .catch(reject);
+          });
+        } catch (err) {
+          if (err instanceof Response) {
+            return err;
+          } else {
+            console.error(`Unexpected error: ${err}`);
+          }
+        }
+
+        // TODO track gas fee for failure
       }
 
       return new Response(null, { status: 204 });

@@ -39,6 +39,38 @@ export const bots = new Hono()
     return c.json(game);
   });
 
+export class BotIds {
+  private state: DurableObjectState;
+  private app: Hono;
+  private botIds: string[];
+
+  constructor(state: DurableObjectState) {
+    this.state = state;
+    this.botIds = [];
+    this.state.blockConcurrencyWhile(async () => {
+      this.botIds = (await this.state.storage.get<string[]>(`botIds`)) ?? [];
+    });
+
+    this.app = new Hono();
+    this.app
+      .get('*', async c => {
+        return c.json(this.botIds);
+      })
+      .post('*', async c => {
+        const botIds = await c.req.json<string[]>();
+
+        this.botIds = Array.from(new Set([...this.botIds, ...botIds]));
+        await this.state.storage.put('botIds', this.botIds);
+
+        return new Response(null, { status: 204 });
+      });
+  }
+
+  async fetch(request: Request): Promise<Response> {
+    return this.app.fetch(request);
+  }
+}
+
 export class Bots {
   private state: DurableObjectState;
   private app: Hono;
@@ -70,7 +102,7 @@ export class Bots {
       .get('/daily', async () => {
         return new Response('', { status: 503 });
       })
-      .get('/', async c => {
+      .get('*', async c => {
         const { limit: limitStr, skip: skipStr } = c.req.query();
         const limit = Number(limitStr);
         const skip = Number(skipStr);
@@ -82,17 +114,22 @@ export class Bots {
 
         return c.json(slice);
       })
-      .post('/', async c => {
+      .post('*', async c => {
         const events = await c.req.json<Arbitrage[]>();
 
-        this.arbitrages.concat(events);
+        this.arbitrages = this.arbitrages.concat(events);
         let slice = this.arbitrages.slice(this.index * this.pageSize);
         if (slice.length > this.pageSize) {
           this.index++;
           slice = this.arbitrages.slice(this.index * this.pageSize);
         }
-        await this.state.storage.put(`arbitrage${this.index}`, slice);
+        await this.state.storage.put(`arbitrages${this.index}`, slice);
 
+        return new Response(null, { status: 204 });
+      })
+      .delete('*', async () => {
+        this.arbitrages = [];
+        await this.state.storage.deleteAll();
         return new Response(null, { status: 204 });
       });
   }
