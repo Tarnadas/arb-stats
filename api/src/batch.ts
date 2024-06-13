@@ -67,16 +67,22 @@ batch
 
       for (const senderId of allSenders) {
         const successEvents = batchEvents
-          .flatMap(({ events }) => events)
+          .flatMap(({ blockHeight, timestamp, events }) =>
+            events.map(event => ({ blockHeight, timestamp, ...event }))
+          )
           .filter(event => event.senderId === senderId)
           .filter(event => event.status === 'success')
           .map(
             event =>
               ({
                 senderId: event.senderId,
+                blockHeight: event.blockHeight,
+                timestamp: event.timestamp,
                 txHash: event.txHash,
-                profit: (event as Arbitrage).profit
-              }) as Arbitrage
+                gasBurnt: event.gasBurnt,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                profit: (event as any).profit
+              }) satisfies Arbitrage
           );
         if (successEvents.length === 0) {
           continue;

@@ -2,7 +2,10 @@ import { z } from 'zod';
 
 const zodArbitrage = z.object({
   senderId: z.string(),
+  blockHeight: z.number(),
+  timestamp: z.number(),
   txHash: z.string(),
+  gasBurnt: z.number(),
   profit: z.string()
 });
 export type Arbitrage = z.infer<typeof zodArbitrage>;
@@ -16,12 +19,14 @@ export const zodBatchEvent = z
         z.object({
           senderId: z.string(),
           txHash: z.string(),
+          gasBurnt: z.number(),
           profit: z.string(),
           status: z.literal('success')
         }),
         z.object({
           senderId: z.string(),
           txHash: z.string(),
+          gasBurnt: z.number(),
           status: z.literal('failure')
         })
       ])

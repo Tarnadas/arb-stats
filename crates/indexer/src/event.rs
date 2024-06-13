@@ -6,6 +6,7 @@ use serde::Serialize;
 pub struct ArbEvent {
     pub sender_id: AccountId,
     pub tx_hash: CryptoHash,
+    pub gas_burnt: u64,
     #[serde(flatten)]
     pub event: ArbStatus,
 }

@@ -144,6 +144,12 @@ async fn handle_block(
         }
     })
     .filter_map(|(sender_id, tx_hash, outcome)| {
+        let gas_burnt = outcome.transaction_outcome.outcome.gas_burnt
+            + outcome
+                .receipts_outcome
+                .iter()
+                .map(|outcome| outcome.outcome.gas_burnt)
+                .sum::<u64>();
         match outcome.status {
             near_primitives::views::FinalExecutionStatus::SuccessValue(_) => {
                 if outcome.receipts_outcome[0].outcome.executor_id.as_str() != "v2.ref-finance.near"
@@ -172,19 +178,23 @@ async fn handle_block(
                         )
                     })
                     .unwrap();
-                Some(ArbStatus::Success(
-                    amount_out
-                        .saturating_sub(amount_in)
-                        .as_yoctonear()
-                        .to_string(),
+                Some((
+                    ArbStatus::Success(
+                        amount_out
+                            .saturating_sub(amount_in)
+                            .as_yoctonear()
+                            .to_string(),
+                    ),
+                    gas_burnt,
                 ))
             }
-            _ => Some(ArbStatus::Failure),
+            _ => Some((ArbStatus::Failure, gas_burnt)),
         }
-        .map(|event| ArbEvent {
+        .map(|(event, gas_burnt)| ArbEvent {
             sender_id,
             tx_hash,
             event,
+            gas_burnt,
         })
     })
     .collect();
