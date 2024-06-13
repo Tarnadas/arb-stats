@@ -3,9 +3,8 @@ import { cors } from 'hono/cors';
 import { poweredBy } from 'hono/powered-by';
 import { match } from 'ts-pattern';
 
-import { accounts } from './acounts';
 import { batch } from './batch';
-import { games } from './games';
+import { bots } from './bots';
 import { info } from './info';
 
 const app = new Hono();
@@ -13,17 +12,9 @@ const app = new Hono();
 app.use('*', poweredBy());
 app.use('*', cors());
 
-const infoRoute = app.route('/info', info);
-const gamesRoute = app.route('/games', games);
-const accountsRoute = app.route('/accounts', accounts);
+app.route('/info', info);
+app.route('/bots', bots);
 app.route('/batch', batch);
-
-const testRoute = app.get('/test', c => {
-  return c.json({
-    test: '',
-    test1: 0
-  });
-});
 
 app.onError(
   err =>
@@ -43,11 +34,5 @@ app.notFound(() => {
 
 export default app;
 
-export { Games } from './games';
+export { Bots } from './bots';
 export { Info } from './info';
-
-export type AppType =
-  | typeof infoRoute
-  | typeof gamesRoute
-  | typeof accountsRoute
-  | typeof testRoute;

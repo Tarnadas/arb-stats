@@ -10,12 +10,12 @@ routes = [
 [vars]
 # Run `echo <VALUE> | wrangler secret put <NAME>` for each of these
 
-# [durable_objects]
-# bindings = [
-#   { name = "GAMES", class_name = "Games" },
-#   { name = "INFO", class_name = "Info" },
-# ]
+[durable_objects]
+bindings = [
+  { name = "INFO", class_name = "Info" },
+  { name = "BOTS", class_name = "Bots" },
+]
 
-# [[migrations]]
-# tag = "v1"
-# new_classes = ["Games", "Info"]
+[[migrations]]
+tag = "v1"
+new_classes = ["Info", "Bots"]

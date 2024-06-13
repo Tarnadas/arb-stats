@@ -10,8 +10,8 @@ declare module 'hono' {
       // MY_KV_NAMESPACE: KVNamespace;
       //
       // Durable Objects. Learn more at https://developers.cloudflare.com/workers/runtime-apis/durable-objects/
-      // INFO: DurableObjectNamespace;
-      // GAMES: DurableObjectNamespace;
+      INFO: DurableObjectNamespace;
+      BOTS: DurableObjectNamespace;
       //
       // Example binding to R2. Learn more at https://developers.cloudflare.com/workers/runtime-apis/r2/
       // MY_BUCKET: R2Bucket;

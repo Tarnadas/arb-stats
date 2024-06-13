@@ -1,3 +1,4 @@
+use crate::ArbEvent;
 use anyhow::Result;
 use futures_util::pin_mut;
 use near_primitives::types::BlockHeight;
@@ -9,10 +10,9 @@ use serde::Serialize;
 use std::env;
 use tokio_stream::{Stream, StreamExt};
 
-use crate::ArbEvent;
-
 #[derive(Debug, Serialize)]
-struct BatchEvent {
+#[serde(rename_all = "camelCase")]
+struct BlockEvent {
     pub block_height: BlockHeight,
     pub timestamp: u64,
     pub events: Vec<ArbEvent>,
@@ -31,20 +31,23 @@ pub async fn send_data(
     pin_mut!(stream);
 
     let mut last_block_height = 0;
-    const MAX_BLOCK_HEIGHT_DIFF: BlockHeight = 100;
+    const MAX_BLOCK_HEIGHT_DIFF: BlockHeight = 500;
+    let mut batch_event = vec![];
     while let Some((block_height, timestamp, events)) = stream.next().await {
-        let batch_event = BatchEvent {
+        let block_event = BlockEvent {
             block_height,
             timestamp,
             events,
         };
+        batch_event.push(block_event);
 
-        if !batch_event.events.is_empty()
-            || block_height - last_block_height >= MAX_BLOCK_HEIGHT_DIFF
-        {
+        if block_height - last_block_height >= MAX_BLOCK_HEIGHT_DIFF {
             println!("block_height: {}", block_height);
-            if !batch_event.events.is_empty() {
-                println!("found events: {}", batch_event.events.len());
+            if !batch_event.is_empty() {
+                println!(
+                    "found events: {}",
+                    batch_event.iter().map(|ev| ev.events.len()).sum::<usize>()
+                );
             }
             last_block_height = block_height;
             match client
