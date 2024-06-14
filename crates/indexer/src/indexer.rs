@@ -108,13 +108,16 @@ async fn handle_block(block: BlockView, rpc_client: &JsonRpcClient) -> Result<Ve
     let swapped_to_regex = Regex::new(" for ([0-9]*) wrap.near").unwrap();
 
     let tx_hashes: Vec<_> = try_join_all(block.chunks.iter().map(|chunk| async {
-        rpc_client
-            .call(methods::chunk::RpcChunkRequest {
+        tryhard::retry_fn(|| {
+            rpc_client.call(methods::chunk::RpcChunkRequest {
                 chunk_reference: ChunkReference::ChunkHash {
                     chunk_id: chunk.chunk_hash,
                 },
             })
-            .await
+        })
+        .retries(5)
+        .linear_backoff(Duration::from_millis(100))
+        .await
     }))
     .await?
     .par_iter()
