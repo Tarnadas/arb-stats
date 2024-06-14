@@ -1,4 +1,5 @@
-import { Hono } from 'hono';
+import { swaggerUI } from '@hono/swagger-ui';
+import { OpenAPIHono } from '@hono/zod-openapi';
 import { cors } from 'hono/cors';
 import { poweredBy } from 'hono/powered-by';
 import { match } from 'ts-pattern';
@@ -7,7 +8,7 @@ import { batch } from './batch';
 import { bots } from './bots';
 import { info } from './info';
 
-const app = new Hono();
+const app = new OpenAPIHono();
 
 app.use('*', poweredBy());
 app.use('*', cors());
@@ -15,6 +16,16 @@ app.use('*', cors());
 app.route('/info', info);
 app.route('/bots', bots);
 app.route('/batch', batch);
+
+app.get('/', swaggerUI({ url: '/doc' }));
+
+app.doc('/doc', {
+  openapi: '3.0.0',
+  info: {
+    version: '1.0.0',
+    title: 'Arbitrage Bot Stats API'
+  }
+});
 
 app.onError(
   err =>

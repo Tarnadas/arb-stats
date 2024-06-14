@@ -1,43 +1,107 @@
+import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
 import { Hono } from 'hono';
 
-import { Arbitrage } from './events';
+import { Arbitrage, zArbitrage } from './events';
 
-type DailyArbStats = {
-  hourlyTimestamp: string;
-  profits: string;
-};
+const zDailyArbStats = z.object({
+  hourlyTimestamp: z.string(),
+  profits: z.string()
+});
 
-export const bots = new Hono()
-  .get('/:bot_id/daily', async c => {
-    const botId = c.req.param('bot_id');
-    const addr = c.env.BOTS.idFromName(botId);
-    const obj = c.env.BOTS.get(addr);
-    const res = await obj.fetch(`${new URL(c.req.url).origin}/daily`);
-    const game = await res.json<DailyArbStats[]>();
-    return c.json(game);
-  })
-  .get('/:bot_id', async c => {
-    const botId = c.req.param('bot_id');
-    const addr = c.env.BOTS.idFromName(botId);
-    const obj = c.env.BOTS.get(addr);
-    let { limit, skip } = c.req.query();
-    limit = limit || '100';
-    skip = skip || '0';
-    try {
-      parseInt(limit);
-      parseInt(skip);
-    } catch (err) {
-      return new Response(
-        '`limit` and `skip` search param must be an integer',
-        { status: 400 }
-      );
+type DailyArbStats = z.infer<typeof zDailyArbStats>;
+
+export const bots = new OpenAPIHono();
+bots
+  .openapi(
+    createRoute({
+      method: 'get',
+      path: '/{bot_id}/daily',
+      request: {},
+      responses: {
+        200: {
+          content: {
+            'application/json': {
+              schema: zDailyArbStats.array()
+            }
+          },
+          description: 'Returns daily arbitrage statistics'
+        }
+      }
+    }),
+    async c => {
+      const botId = c.req.param('bot_id');
+      const addr = c.env.BOTS.idFromName(botId);
+      const obj = c.env.BOTS.get(addr);
+      const res = await obj.fetch(`${new URL(c.req.url).origin}/daily`);
+      const game = await res.json<DailyArbStats[]>();
+      return c.json(game);
     }
-    const res = await obj.fetch(
-      `${new URL(c.req.url).origin}?limit=${limit}&skip=${skip}`
-    );
-    const game = await res.json<Arbitrage[]>();
-    return c.json(game);
-  });
+  )
+  .openapi(
+    createRoute({
+      method: 'get',
+      path: '/{bot_id}',
+      request: {
+        params: z.object({
+          bot_id: z.enum([
+            'bot.marior.near',
+            'bot0.marior.near',
+            'bot2.marior.near',
+            'bot3.marior.near',
+            'bot4.marior.near',
+            'bot5.marior.near',
+            'bot6.marior.near',
+            'aldor.near',
+            'frisky.near',
+            'sneaky1.near',
+            'kagool.near',
+            'zalevsky.near',
+            'foxboss.near',
+            'xy_k.near'
+          ])
+        }),
+        query: z.object({
+          limit: z.string().default('100').optional(),
+          skip: z.string().default('0').optional()
+        })
+      },
+      responses: {
+        200: {
+          content: {
+            'application/json': {
+              schema: zArbitrage.array()
+            }
+          },
+          description: 'Returns all arbitrage trades'
+        },
+        400: {
+          description: '`limit` and `skip` search param must be an integer'
+        }
+      }
+    }),
+    async c => {
+      const botId = c.req.param('bot_id');
+      const addr = c.env.BOTS.idFromName(botId);
+      const obj = c.env.BOTS.get(addr);
+      let { limit, skip } = c.req.query();
+      limit = limit || '100';
+      skip = skip || '0';
+      try {
+        parseInt(limit);
+        parseInt(skip);
+      } catch (err) {
+        return new Response(
+          '`limit` and `skip` search param must be an integer',
+          { status: 400 }
+        );
+      }
+      const res = await obj.fetch(
+        `${new URL(c.req.url).origin}?limit=${limit}&skip=${skip}`
+      );
+      const arbitrages = await res.json<Arbitrage[]>();
+      return c.json(arbitrages);
+    }
+  );
 
 export class BotIds {
   private state: DurableObjectState;

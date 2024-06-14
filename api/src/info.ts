@@ -1,16 +1,37 @@
+import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
 import { Hono } from 'hono';
 
-export type InfoResult = {
-  lastBlockHeight: number;
-};
-
-export const info = new Hono().get('/', async c => {
-  const addr = c.env.INFO.idFromName('');
-  const obj = c.env.INFO.get(addr);
-  const res = await obj.fetch(`${new URL(c.req.url).origin}/info`);
-  const info = await res.json<InfoResult>();
-  return c.json(info);
+const zInfoResult = z.object({
+  lastBlockHeight: z.number()
 });
+
+export type InfoResult = z.infer<typeof zInfoResult>;
+
+export const info = new OpenAPIHono();
+info.openapi(
+  createRoute({
+    method: 'get',
+    path: '/',
+    request: {},
+    responses: {
+      200: {
+        content: {
+          'application/json': {
+            schema: zInfoResult
+          }
+        },
+        description: 'Returns latest indexed block height'
+      }
+    }
+  }),
+  async c => {
+    const addr = c.env.INFO.idFromName('');
+    const obj = c.env.INFO.get(addr);
+    const res = await obj.fetch(`${new URL(c.req.url).origin}/info`);
+    const info = await res.json<InfoResult>();
+    return c.json(info);
+  }
+);
 
 export class Info {
   private state: DurableObjectState;

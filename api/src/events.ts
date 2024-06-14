@@ -1,6 +1,6 @@
-import { z } from 'zod';
+import { z } from '@hono/zod-openapi';
 
-const zodArbitrage = z.object({
+export const zArbitrage = z.object({
   senderId: z.string(),
   blockHeight: z.number(),
   timestamp: z.number(),
@@ -8,7 +8,7 @@ const zodArbitrage = z.object({
   gasBurnt: z.number(),
   profit: z.string()
 });
-export type Arbitrage = z.infer<typeof zodArbitrage>;
+export type Arbitrage = z.infer<typeof zArbitrage>;
 
 export const zodBatchEvent = z
   .object({

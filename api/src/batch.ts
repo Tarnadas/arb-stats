@@ -1,11 +1,11 @@
+import { OpenAPIHono } from '@hono/zod-openapi';
 import { zValidator } from '@hono/zod-validator';
-import { Hono } from 'hono';
 import { bearerAuth } from 'hono/bearer-auth';
 
 import { Arbitrage, zodBatchEvent } from './events';
 import { InfoResult } from './info';
 
-export const batch = new Hono();
+export const batch = new OpenAPIHono();
 batch
   .use('*', async (c, next) => {
     const auth = bearerAuth({ token: c.env.INDEXER_SECRET });
