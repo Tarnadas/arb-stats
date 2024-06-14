@@ -19,7 +19,7 @@ use reqwest::{
     Client, Url,
 };
 use serde::Deserialize;
-use std::{env, str::FromStr};
+use std::{env, str::FromStr, time::Duration};
 use tokio_stream::Stream;
 
 #[derive(Deserialize)]
@@ -147,17 +147,20 @@ async fn handle_block(block: BlockView, rpc_client: &JsonRpcClient) -> Result<Ve
             .map(|(tx_hash, sender_account_id)| {
                 let rpc_client = rpc_client.clone();
                 async move {
-                    rpc_client
-                        .call(
+                    tryhard::retry_fn(|| {
+                        rpc_client.call(
                             methods::EXPERIMENTAL_tx_status::RpcTransactionStatusRequest {
                                 transaction_info: TransactionInfo::TransactionId {
                                     tx_hash,
-                                    sender_account_id,
+                                    sender_account_id: sender_account_id.clone(),
                                 },
                                 wait_until: TxExecutionStatus::Final,
                             },
                         )
-                        .await
+                    })
+                    .retries(5)
+                    .linear_backoff(Duration::from_millis(100))
+                    .await
                 }
             }),
     )
