@@ -157,27 +157,25 @@ async fn handle_block(
                     return None;
                 }
                 let amount_in = NearToken::from_yoctonear(
-                    swapped_from_regex
-                        .captures(&outcome.receipts_outcome[0].outcome.logs[0])
-                        .unwrap()
-                        .get(1)
-                        .unwrap()
-                        .as_str()
-                        .parse::<u128>()
-                        .unwrap(),
+                    outcome.receipts_outcome[0]
+                        .outcome
+                        .logs
+                        .iter()
+                        .filter_map(|logs| swapped_from_regex.captures(logs))
+                        .filter_map(|captures| captures.get(1))
+                        .filter_map(|m| m.as_str().parse::<u128>().ok())
+                        .sum::<u128>(),
                 );
-                let amount_out = outcome.receipts_outcome[0]
-                    .outcome
-                    .logs
-                    .iter()
-                    .rev()
-                    .find_map(|log| swapped_to_regex.captures(log))
-                    .map(|swapped_to| {
-                        NearToken::from_yoctonear(
-                            swapped_to.get(1).unwrap().as_str().parse::<u128>().unwrap(),
-                        )
-                    })
-                    .unwrap();
+                let amount_out = NearToken::from_yoctonear(
+                    outcome.receipts_outcome[0]
+                        .outcome
+                        .logs
+                        .iter()
+                        .filter_map(|logs| swapped_to_regex.captures(logs))
+                        .filter_map(|captures| captures.get(1))
+                        .filter_map(|m| m.as_str().parse::<u128>().ok())
+                        .sum::<u128>(),
+                );
                 Some((
                     ArbStatus::Success(
                         amount_out
