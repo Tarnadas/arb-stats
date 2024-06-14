@@ -20,3 +20,11 @@ bindings = [
 [[migrations]]
 tag = "v1"
 new_classes = ["Info", "Bots", "BotIds"]
+
+[[migrations]]
+tag = "v2"
+deleted_classes = ["Info", "Bots", "BotIds"]
+
+[[migrations]]
+tag = "v3"
+new_classes = ["Info", "Bots", "BotIds"]
