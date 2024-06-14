@@ -63,31 +63,18 @@ batch
       });
 
       for (const senderId of allSenders) {
-        const successEvents = batchEvents
+        const events = batchEvents
           .flatMap(({ blockHeight, timestamp, events }) =>
             events.map(event => ({ blockHeight, timestamp, ...event }))
           )
-          .filter(event => event.senderId === senderId)
-          .filter(event => event.status === 'success')
-          .map(
-            event =>
-              ({
-                senderId: event.senderId,
-                blockHeight: event.blockHeight,
-                timestamp: event.timestamp,
-                txHash: event.txHash,
-                gasBurnt: event.gasBurnt,
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                profit: (event as any).profit
-              }) satisfies Arbitrage
-          );
-        if (successEvents.length === 0) {
+          .filter(event => event.senderId === senderId);
+        if (events.length === 0) {
           continue;
         }
 
         try {
           await new Promise<void>((resolve, reject) => {
-            console.info(successEvents);
+            console.info(events);
 
             const botsAddr = c.env.BOTS.idFromName(senderId);
             const botsStub = c.env.BOTS.get(botsAddr);
@@ -95,7 +82,7 @@ batch
             awaitResponse(
               botsStub.fetch(`${new URL(c.req.url).origin}`, {
                 method: 'POST',
-                body: JSON.stringify(successEvents)
+                body: JSON.stringify(events satisfies Arbitrage[])
               }),
               reject
             )
