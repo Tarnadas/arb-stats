@@ -16,8 +16,8 @@ async fn main() -> anyhow::Result<()> {
     let rpc_url = env::var("RPC_URL")?;
     let rpc_client = JsonRpcClient::connect(&rpc_url);
 
-    let stream = poll_block(&rpc_client).await?;
-    send_data(stream).await?;
+    let (stream, block_height) = poll_block(&rpc_client).await?;
+    send_data(stream, block_height).await?;
 
     Ok(())
 }

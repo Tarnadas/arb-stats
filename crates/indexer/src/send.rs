@@ -20,6 +20,7 @@ struct BlockEvent {
 
 pub async fn send_data(
     stream: impl Stream<Item = (BlockHeight, u64, Vec<ArbEvent>)>,
+    mut last_block_height: BlockHeight,
 ) -> Result<()> {
     let mut headers = HeaderMap::new();
     headers.insert(
@@ -30,7 +31,6 @@ pub async fn send_data(
     let base_url = Url::parse(&env::var("API_BASE_URL")?)?;
     pin_mut!(stream);
 
-    let mut last_block_height = env::var("START_BLOCK_HEIGHT")?.parse()?;
     let max_block_height_diff: BlockHeight = env::var("MAX_BLOCK_HEIGHT_DIFF")?.parse()?;
     let mut batch_event = vec![];
     while let Some((block_height, timestamp, events)) = stream.next().await {

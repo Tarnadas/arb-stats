@@ -29,7 +29,10 @@ struct Info {
 
 pub async fn poll_block(
     rpc_client: &JsonRpcClient,
-) -> Result<impl Stream<Item = (BlockHeight, u64, Vec<ArbEvent>)> + '_> {
+) -> Result<(
+    impl Stream<Item = (BlockHeight, u64, Vec<ArbEvent>)> + '_,
+    BlockHeight,
+)> {
     let mut block_height = get_current_block_height().await?;
 
     let arb_bots: Vec<_> = env::var("ARB_BOTS")
@@ -41,32 +44,35 @@ pub async fn poll_block(
     let swapped_from_regex = Regex::new("Swapped ([0-9]*) wrap.near").unwrap();
     let swapped_to_regex = Regex::new(" for ([0-9]*) wrap.near").unwrap();
 
-    Ok(stream! {
-        loop {
-            match rpc_client
-            .call(methods::block::RpcBlockRequest {
-                block_reference: BlockReference::BlockId(BlockId::Height(block_height)),
-            })
-            .await {
-                Ok(block) => {
-                    block_height += 1;
-                    let timestamp = block.header.timestamp_nanosec;
+    Ok((
+        stream! {
+            loop {
+                match rpc_client
+                .call(methods::block::RpcBlockRequest {
+                    block_reference: BlockReference::BlockId(BlockId::Height(block_height)),
+                })
+                .await {
+                    Ok(block) => {
+                        block_height += 1;
+                        let timestamp = block.header.timestamp_nanosec;
 
-                    yield (
-                        block_height,
-                        timestamp,
-                        handle_block(block, &arb_bots, &swapped_from_regex, &swapped_to_regex, rpc_client)
-                            .await
-                            .unwrap(),
-                    );
-                },
-                Err(err) => {
-                    dbg!(err);
-                    block_height += 1;
-                },
+                        yield (
+                            block_height,
+                            timestamp,
+                            handle_block(block, &arb_bots, &swapped_from_regex, &swapped_to_regex, rpc_client)
+                                .await
+                                .unwrap(),
+                        );
+                    },
+                    Err(err) => {
+                        dbg!(err);
+                        block_height += 1;
+                    },
+                }
             }
-        }
-    })
+        },
+        block_height,
+    ))
 }
 
 async fn handle_block(
