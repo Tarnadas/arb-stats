@@ -102,8 +102,8 @@ bots
         }),
         query: z.object({
           status: z.enum(['success', 'failure']).default('success').optional(),
-          limit: z.string().default('100').optional(),
-          skip: z.string().default('0').optional()
+          limit: z.coerce.number().max(100).default(100).optional(),
+          skip: z.coerce.number().default(0).optional()
         })
       },
       responses: {
