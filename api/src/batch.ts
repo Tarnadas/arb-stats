@@ -3,13 +3,29 @@ import { zValidator } from '@hono/zod-validator';
 import { bearerAuth } from 'hono/bearer-auth';
 
 import { Arbitrage, zodBatchEvent } from './events';
-import { InfoResult } from './info';
 
 export const batch = new OpenAPIHono();
 batch
   .use('*', async (c, next) => {
     const auth = bearerAuth({ token: c.env.INDEXER_SECRET });
     await auth(c, next);
+  })
+  .delete('', async c => {
+    console.info('clearing old data...');
+    const botIdsAddr = c.env.BOT_IDS.idFromName('');
+    const botIdsStub = c.env.BOT_IDS.get(botIdsAddr);
+    const res = await botIdsStub.fetch(`${new URL(c.req.url).origin}`);
+    const botIds = await res.json<string[]>();
+    await Promise.all(
+      botIds.map(botId => {
+        const addr = c.env.BOTS.idFromName(botId);
+        const obj = c.env.BOTS.get(addr);
+        return obj.fetch(`${new URL(c.req.url).origin}`, {
+          method: 'DELETE'
+        });
+      })
+    );
+    console.info('clearing finished');
   })
   .post(
     '',
@@ -29,25 +45,6 @@ batch
       const infoStub = c.env.INFO.get(infoAddr);
       const botIdsAddr = c.env.BOT_IDS.idFromName('');
       const botIdsStub = c.env.BOT_IDS.get(botIdsAddr);
-
-      const res = await infoStub.fetch(`${new URL(c.req.url).origin}`);
-      const { lastBlockHeight } = await res.json<InfoResult>();
-
-      if (blockHeight <= lastBlockHeight) {
-        console.info('clearing old data...');
-        const res = await botIdsStub.fetch(`${new URL(c.req.url).origin}`);
-        const botIds = await res.json<string[]>();
-        await Promise.all(
-          botIds.map(botId => {
-            const addr = c.env.BOTS.idFromName(botId);
-            const obj = c.env.BOTS.get(addr);
-            return obj.fetch(`${new URL(c.req.url).origin}`, {
-              method: 'DELETE'
-            });
-          })
-        );
-        console.info('clearing finished');
-      }
 
       await infoStub.fetch(`${new URL(c.req.url).origin}/last_block_height`, {
         method: 'POST',
