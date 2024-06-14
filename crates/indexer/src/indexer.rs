@@ -27,10 +27,11 @@ struct Info {
     last_block_height: u64,
 }
 
-pub async fn poll_block(
-    rpc_client: &JsonRpcClient,
+pub async fn poll_block<'a>(
+    rpc_client: &'a JsonRpcClient,
+    fallback_rpc_client: &'a JsonRpcClient,
 ) -> Result<(
-    impl Stream<Item = (BlockHeight, u64, Vec<ArbEvent>)> + '_,
+    impl Stream<Item = (BlockHeight, u64, Vec<ArbEvent>)> + 'a,
     BlockHeight,
 )> {
     let mut block_height = get_current_block_height().await?;
@@ -47,27 +48,51 @@ pub async fn poll_block(
     Ok((
         stream! {
             loop {
-                match rpc_client
-                .call(methods::block::RpcBlockRequest {
-                    block_reference: BlockReference::BlockId(BlockId::Height(block_height)),
-                })
-                .await {
-                    Ok(block) => {
+                let block = match rpc_client
+                    .call(methods::block::RpcBlockRequest {
+                        block_reference: BlockReference::BlockId(BlockId::Height(block_height)),
+                    })
+                    .await
+                    .map_err(|_| {
+                        fallback_rpc_client.call(methods::block::RpcBlockRequest {
+                            block_reference: BlockReference::BlockId(BlockId::Height(block_height)),
+                        })
+                    }) {
+                    Ok(block) => Some((block, false)),
+                    Err(res) => match res.await {
+                        Ok(block) => Some((block, true)),
+                        Err(err) => {
+                            dbg!(err);
+                            None
+                        }
+                    },
+                };
+                match block {
+                    Some((block, use_fallback)) => {
                         block_height += 1;
                         let timestamp = block.header.timestamp_nanosec;
 
                         yield (
                             block_height,
                             timestamp,
-                            handle_block(block, &arb_bots, &swapped_from_regex, &swapped_to_regex, rpc_client)
-                                .await
-                                .unwrap(),
+                            handle_block(
+                                block,
+                                &arb_bots,
+                                &swapped_from_regex,
+                                &swapped_to_regex,
+                                if use_fallback {
+                                    fallback_rpc_client
+                                } else {
+                                    rpc_client
+                                },
+                            )
+                            .await
+                            .unwrap(),
                         );
-                    },
-                    Err(err) => {
-                        dbg!(err);
+                    }
+                    None => {
                         block_height += 1;
-                    },
+                    }
                 }
             }
         },
