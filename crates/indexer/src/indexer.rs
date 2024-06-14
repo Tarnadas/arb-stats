@@ -55,8 +55,7 @@ pub async fn poll_block<'a>(
                         Ok(block) => Some((block, false)),
                         Err(res) => match res.await {
                             Ok(block) => Some((block, true)),
-                            Err(err) => {
-                                dbg!(err);
+                            Err(_) => {
                                 None
                             }
                         },

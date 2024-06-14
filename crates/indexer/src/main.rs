@@ -11,7 +11,7 @@ use std::env;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    dotenv::dotenv()?;
+    let _ = dotenv::dotenv();
 
     let rpc_url = env::var("RPC_URL")?;
     let rpc_client = JsonRpcClient::connect(&rpc_url);

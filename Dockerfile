@@ -6,7 +6,7 @@ RUN cargo install cargo-chef
 
 FROM chef AS planner
 
-COPY crates/bot crates/bot
+COPY crates crates
 COPY Cargo.toml Cargo.toml
 COPY Cargo.lock Cargo.lock
 COPY rust-toolchain.toml rust-toolchain.toml
@@ -25,7 +25,7 @@ RUN cargo chef cook --release --recipe-path recipe.json
 COPY crates crates
 COPY Cargo.toml Cargo.toml
 COPY Cargo.lock Cargo.lock
-RUN cargo build --release -p arbotrage
+RUN cargo build --release
 
 
 FROM debian:bookworm-slim
