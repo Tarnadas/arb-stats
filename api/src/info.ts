@@ -10,6 +10,7 @@ export type InfoResult = z.infer<typeof zInfoResult>;
 export const info = new OpenAPIHono();
 info.openapi(
   createRoute({
+    description: 'Returns latest indexed block height',
     method: 'get',
     path: '/',
     request: {},
@@ -20,7 +21,7 @@ info.openapi(
             schema: zInfoResult
           }
         },
-        description: 'Returns latest indexed block height'
+        description: 'latest indexed block height'
       }
     }
   }),
