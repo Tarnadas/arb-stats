@@ -1,7 +1,8 @@
 use crate::{ArbEvent, ArbStatus};
 use anyhow::Result;
 use async_stream::stream;
-use futures_util::future::try_join_all;
+use futures_util::future::{join_all, try_join_all};
+use itertools::Itertools;
 use near_jsonrpc_client::{
     methods::{self, chunk::ChunkReference, tx::TransactionInfo},
     JsonRpcClient,
@@ -34,65 +35,63 @@ pub async fn poll_block<'a>(
     impl Stream<Item = (BlockHeight, u64, Vec<ArbEvent>)> + 'a,
     BlockHeight,
 )> {
-    let mut block_height = get_current_block_height().await?;
-
-    let arb_bots: Vec<_> = env::var("ARB_BOTS")
-        .unwrap()
-        .split(',')
-        .map(|account_id| AccountId::from_str(account_id).unwrap())
-        .collect();
-
-    let swapped_from_regex = Regex::new("Swapped ([0-9]*) wrap.near").unwrap();
-    let swapped_to_regex = Regex::new(" for ([0-9]*) wrap.near").unwrap();
+    let block_height = get_current_block_height().await?;
+    let max_concurrency = env::var("MAX_CONCURRENCY").unwrap().parse::<usize>()?;
 
     Ok((
         stream! {
-            loop {
-                let block = match rpc_client
-                    .call(methods::block::RpcBlockRequest {
-                        block_reference: BlockReference::BlockId(BlockId::Height(block_height)),
-                    })
-                    .await
-                    .map_err(|_| {
-                        fallback_rpc_client.call(methods::block::RpcBlockRequest {
+            for chunk in (block_height..).chunks(max_concurrency).into_iter() {
+                let block_results: Vec<_> = join_all(chunk.map(|block_height| async move {
+                    let block = match rpc_client
+                        .call(methods::block::RpcBlockRequest {
                             block_reference: BlockReference::BlockId(BlockId::Height(block_height)),
                         })
-                    }) {
-                    Ok(block) => Some((block, false)),
-                    Err(res) => match res.await {
-                        Ok(block) => Some((block, true)),
-                        Err(err) => {
-                            dbg!(err);
+                        .await
+                        .map_err(|_| {
+                            fallback_rpc_client.call(methods::block::RpcBlockRequest {
+                                block_reference: BlockReference::BlockId(BlockId::Height(block_height)),
+                            })
+                        }) {
+                        Ok(block) => Some((block, false)),
+                        Err(res) => match res.await {
+                            Ok(block) => Some((block, true)),
+                            Err(err) => {
+                                dbg!(err);
+                                None
+                            }
+                        },
+                    };
+                    match block {
+                        Some((block, use_fallback)) => {
+                            let timestamp = block.header.timestamp_nanosec;
+
+                            Some((
+                                block_height,
+                                timestamp,
+                                handle_block(
+                                    block,
+                                    if use_fallback {
+                                        fallback_rpc_client
+                                    } else {
+                                        rpc_client
+                                    },
+                                )
+                                .await
+                                .unwrap(),
+                            ))
+                        }
+                        None => {
                             None
                         }
-                    },
-                };
-                match block {
-                    Some((block, use_fallback)) => {
-                        block_height += 1;
-                        let timestamp = block.header.timestamp_nanosec;
+                    }
+                }))
+                .await
+                .into_iter()
+                .flatten()
+                .collect();
 
-                        yield (
-                            block_height,
-                            timestamp,
-                            handle_block(
-                                block,
-                                &arb_bots,
-                                &swapped_from_regex,
-                                &swapped_to_regex,
-                                if use_fallback {
-                                    fallback_rpc_client
-                                } else {
-                                    rpc_client
-                                },
-                            )
-                            .await
-                            .unwrap(),
-                        );
-                    }
-                    None => {
-                        block_height += 1;
-                    }
+                for block_result in block_results {
+                    yield block_result;
                 }
             }
         },
@@ -100,13 +99,15 @@ pub async fn poll_block<'a>(
     ))
 }
 
-async fn handle_block(
-    block: BlockView,
-    arb_bots: &[AccountId],
-    swapped_from_regex: &Regex,
-    swapped_to_regex: &Regex,
-    rpc_client: &JsonRpcClient,
-) -> Result<Vec<ArbEvent>> {
+async fn handle_block(block: BlockView, rpc_client: &JsonRpcClient) -> Result<Vec<ArbEvent>> {
+    let arb_bots: Vec<_> = env::var("ARB_BOTS")
+        .unwrap()
+        .split(',')
+        .map(|account_id| AccountId::from_str(account_id).unwrap())
+        .collect();
+    let swapped_from_regex = Regex::new("Swapped ([0-9]*) wrap.near").unwrap();
+    let swapped_to_regex = Regex::new(" for ([0-9]*) wrap.near").unwrap();
+
     let tx_hashes: Vec<_> = try_join_all(block.chunks.iter().map(|chunk| async {
         rpc_client
             .call(methods::chunk::RpcChunkRequest {
@@ -140,21 +141,27 @@ async fn handle_block(
     })
     .collect();
 
-    let events = try_join_all(tx_hashes.iter().cloned().map(
-        |(tx_hash, sender_account_id)| async move {
-            rpc_client
-                .call(
-                    methods::EXPERIMENTAL_tx_status::RpcTransactionStatusRequest {
-                        transaction_info: TransactionInfo::TransactionId {
-                            tx_hash,
-                            sender_account_id,
-                        },
-                        wait_until: TxExecutionStatus::Final,
-                    },
-                )
-                .await
-        },
-    ))
+    let events = try_join_all(
+        tx_hashes
+            .iter()
+            .cloned()
+            .map(|(tx_hash, sender_account_id)| {
+                let rpc_client = rpc_client.clone();
+                async move {
+                    rpc_client
+                        .call(
+                            methods::EXPERIMENTAL_tx_status::RpcTransactionStatusRequest {
+                                transaction_info: TransactionInfo::TransactionId {
+                                    tx_hash,
+                                    sender_account_id,
+                                },
+                                wait_until: TxExecutionStatus::Final,
+                            },
+                        )
+                        .await
+                }
+            }),
+    )
     .await?
     .into_iter()
     .enumerate()

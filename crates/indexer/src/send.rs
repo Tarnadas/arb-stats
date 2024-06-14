@@ -1,6 +1,6 @@
 use crate::ArbEvent;
 use anyhow::Result;
-use futures_util::pin_mut;
+use futures_util::{pin_mut, StreamExt};
 use near_primitives::types::BlockHeight;
 use reqwest::{
     header::{HeaderMap, AUTHORIZATION},
@@ -8,7 +8,7 @@ use reqwest::{
 };
 use serde::Serialize;
 use std::env;
-use tokio_stream::{Stream, StreamExt};
+use tokio_stream::Stream;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
