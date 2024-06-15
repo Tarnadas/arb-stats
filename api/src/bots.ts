@@ -204,7 +204,7 @@ export class Bots {
   private arbitrages: Arbitrage[];
   private arbitrageFailures: Arbitrage[];
   private index: number;
-  private readonly pageSize = 1_000;
+  private readonly pageSize = 200;
 
   constructor(state: DurableObjectState) {
     this.state = state;
