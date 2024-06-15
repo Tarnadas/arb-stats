@@ -1,14 +1,17 @@
 import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
+import dayjs from 'dayjs';
 import { Hono } from 'hono';
 
 import { Arbitrage, zArbitrage } from './events';
 
-const zDailyArbStats = z.object({
-  hourlyTimestamp: z.string(),
+const zDailyProfitStats = z.object({
+  date: z.string(),
+  from: z.number(),
+  to: z.number(),
   profits: z.string()
 });
 
-type DailyProfitStats = z.infer<typeof zDailyArbStats>;
+type DailyProfitStats = z.infer<typeof zDailyProfitStats>;
 
 const zDailyGasStats = z.object({
   hourlyTimestamp: z.string(),
@@ -17,6 +20,23 @@ const zDailyGasStats = z.object({
 
 type DailyGasStats = z.infer<typeof zDailyGasStats>;
 
+const botIds = z.enum([
+  'bot.marior.near',
+  'bot0.marior.near',
+  'bot2.marior.near',
+  'bot3.marior.near',
+  'bot4.marior.near',
+  'bot5.marior.near',
+  'bot6.marior.near',
+  'aldor.near',
+  'frisky.near',
+  'sneaky1.near',
+  'kagool.near',
+  'zalevsky.near',
+  'foxboss.near',
+  'xy_k.near'
+]);
+
 export const bots = new OpenAPIHono();
 bots
   .openapi(
@@ -24,17 +44,20 @@ bots
       description: 'Returns daily arbitrage statistics',
       method: 'get',
       path: '/{bot_id}/daily/profit',
-      request: {},
+      request: {
+        params: z.object({
+          bot_id: botIds
+        }),
+        query: z.object({
+          limit: z.coerce.number().max(20).default(20).optional(),
+          skip: z.coerce.number().default(0).optional()
+        })
+      },
       responses: {
         200: {
           content: {
             'application/json': {
-              schema: z
-                .object({
-                  hourlyTimestamp: z.string(),
-                  profits: z.string()
-                })
-                .array()
+              schema: zDailyProfitStats.array()
             }
           },
           description: 'daily arbitrage statistics'
@@ -45,7 +68,12 @@ bots
       const botId = c.req.param('bot_id');
       const addr = c.env.BOTS.idFromName(botId);
       const obj = c.env.BOTS.get(addr);
-      const res = await obj.fetch(`${new URL(c.req.url).origin}/daily`);
+      let { limit, skip } = c.req.query();
+      limit = limit || '100';
+      skip = skip || '0';
+      const res = await obj.fetch(
+        `${new URL(c.req.url).origin}/daily/profit?limit=${limit}&skip=${skip}`
+      );
       const game = await res.json<DailyProfitStats[]>();
       return c.json(game);
     }
@@ -55,7 +83,15 @@ bots
       description: 'Returns daily gas usage',
       method: 'get',
       path: '/{bot_id}/daily/gas',
-      request: {},
+      request: {
+        params: z.object({
+          bot_id: botIds
+        }),
+        query: z.object({
+          limit: z.coerce.number().max(20).default(20).optional(),
+          skip: z.coerce.number().default(0).optional()
+        })
+      },
       responses: {
         200: {
           content: {
@@ -71,7 +107,7 @@ bots
       const botId = c.req.param('bot_id');
       const addr = c.env.BOTS.idFromName(botId);
       const obj = c.env.BOTS.get(addr);
-      const res = await obj.fetch(`${new URL(c.req.url).origin}/daily`);
+      const res = await obj.fetch(`${new URL(c.req.url).origin}/daily/gas`);
       const game = await res.json<DailyGasStats[]>();
       return c.json(game);
     }
@@ -83,22 +119,7 @@ bots
       path: '/{bot_id}',
       request: {
         params: z.object({
-          bot_id: z.enum([
-            'bot.marior.near',
-            'bot0.marior.near',
-            'bot2.marior.near',
-            'bot3.marior.near',
-            'bot4.marior.near',
-            'bot5.marior.near',
-            'bot6.marior.near',
-            'aldor.near',
-            'frisky.near',
-            'sneaky1.near',
-            'kagool.near',
-            'zalevsky.near',
-            'foxboss.near',
-            'xy_k.near'
-          ])
+          bot_id: botIds
         }),
         query: z.object({
           status: z.enum(['success', 'failure']).default('success').optional(),
@@ -220,8 +241,38 @@ export class Bots {
 
     this.app = new Hono();
     this.app
-      .get('/daily/profit', async () => {
-        return new Response('', { status: 503 });
+      .get('/daily/profit', async c => {
+        const { limit: limitStr, skip: skipStr } = c.req.query();
+        const limit = Number(limitStr);
+        const skip = Number(skipStr);
+
+        let date = dayjs.utc();
+        date.subtract(skip, 'days');
+        date = date.startOf('day');
+
+        // TODO binary search start index
+        const stats: DailyProfitStats[] = [];
+        let profits = 0n;
+        for (let i = this.arbitrages.length - 1; i >= 0; i--) {
+          const arb = this.arbitrages[i];
+          if (arb.timestamp / 1_000_000 < date.valueOf()) {
+            stats.push({
+              date: date.format('YYYY-MM-DD'),
+              from: date.valueOf(),
+              to: date.endOf('day').valueOf(),
+              profits: profits.toString()
+            });
+            if (stats.length === limit) {
+              break;
+            }
+            profits = 0n;
+          }
+          if (arb.status === 'success') {
+            profits += BigInt(arb.profit);
+          }
+        }
+
+        return c.json(stats);
       })
       .get('/daily/gas', async () => {
         return new Response('', { status: 503 });

@@ -1,5 +1,7 @@
 import { swaggerUI } from '@hono/swagger-ui';
 import { OpenAPIHono } from '@hono/zod-openapi';
+import { extend } from 'dayjs';
+import utc from 'dayjs/plugin/utc';
 import { cors } from 'hono/cors';
 import { poweredBy } from 'hono/powered-by';
 import { match } from 'ts-pattern';
@@ -7,6 +9,8 @@ import { match } from 'ts-pattern';
 import { batch } from './batch';
 import { bots } from './bots';
 import { info } from './info';
+
+extend(utc);
 
 const app = new OpenAPIHono();
 
