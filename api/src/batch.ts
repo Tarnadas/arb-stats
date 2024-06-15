@@ -26,6 +26,7 @@ batch
       })
     );
     console.info('clearing finished');
+    return new Response(null, { status: 204 });
   })
   .post(
     '',
@@ -74,7 +75,9 @@ batch
 
         try {
           await new Promise<void>((resolve, reject) => {
-            console.info(events);
+            console.info(
+              `[${new Date().toLocaleString()}] Indexing ${events.length} events`
+            );
 
             const botsAddr = c.env.BOTS.idFromName(senderId);
             const botsStub = c.env.BOTS.get(botsAddr);
@@ -96,8 +99,6 @@ batch
             console.error(`Unexpected error: ${err}`);
           }
         }
-
-        // TODO track gas fee for failure
       }
 
       return new Response(null, { status: 204 });

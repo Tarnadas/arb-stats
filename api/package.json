@@ -12,6 +12,7 @@
     "@hono/swagger-ui": "^0.2.2",
     "@hono/zod-openapi": "^0.14.2",
     "@hono/zod-validator": "^0.2.2",
+    "@tarnadas/fixed-number": "^0.2.2",
     "dayjs": "^1.11.11",
     "hono": "^4.4.5",
     "ts-pattern": "^5.1.2",
