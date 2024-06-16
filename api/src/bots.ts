@@ -20,8 +20,8 @@ const zDailyGasStats = z.object({
   date: z.string(),
   from: z.number(),
   to: z.number(),
-  gas: z.string(),
-  gasNear: z.string()
+  gasBurnt: z.string(),
+  nearBurnt: z.string()
 });
 
 type DailyGasStats = z.infer<typeof zDailyGasStats>;
@@ -75,7 +75,7 @@ bots
       const addr = c.env.BOTS.idFromName(botId);
       const obj = c.env.BOTS.get(addr);
       let { limit, skip } = c.req.query();
-      limit = limit || '100';
+      limit = limit || '20';
       skip = skip || '0';
       const res = await obj.fetch(
         `${new URL(c.req.url).origin}/daily/profit?limit=${limit}&skip=${skip}`
@@ -113,7 +113,12 @@ bots
       const botId = c.req.param('bot_id');
       const addr = c.env.BOTS.idFromName(botId);
       const obj = c.env.BOTS.get(addr);
-      const res = await obj.fetch(`${new URL(c.req.url).origin}/daily/gas`);
+      let { limit, skip } = c.req.query();
+      limit = limit || '20';
+      skip = skip || '0';
+      const res = await obj.fetch(
+        `${new URL(c.req.url).origin}/daily/gas?limit=${limit}&skip=${skip}`
+      );
       const game = await res.json<DailyGasStats[]>();
       return c.json(game);
     }
@@ -260,7 +265,6 @@ export class Bots {
         date = date.subtract(skip, 'days');
         date = date.startOf('day');
 
-        // TODO binary search start index
         let index = binarySearch(
           this.arbitrages,
           date.endOf('day').valueOf(),
@@ -312,8 +316,151 @@ export class Bots {
 
         return c.json(stats);
       })
-      .get('/daily/gas', async () => {
-        return new Response('', { status: 503 });
+      .get('/daily/gas', async c => {
+        const { limit: limitStr, skip: skipStr } = c.req.query();
+        const limit = Number(limitStr);
+        const skip = Number(skipStr);
+
+        let date = dayjs.utc(
+          this.arbitrages[this.arbitrages.length - 1].timestamp / 1_000_000
+        );
+        const dateFailures = dayjs.utc(
+          this.arbitrageFailures[this.arbitrageFailures.length - 1].timestamp /
+            1_000_000
+        );
+        if (dateFailures.isBefore(date)) {
+          date = dateFailures;
+        }
+        date = date.subtract(skip, 'days');
+        date = date.startOf('day');
+        const startDate = date.clone();
+
+        let index = binarySearch(
+          this.arbitrages,
+          date.endOf('day').valueOf(),
+          (arb, needle) => arb.timestamp / 1_000_000 - needle
+        );
+        index = Math.min(index, this.arbitrages.length - 1);
+        if (
+          date.endOf('day').valueOf() <
+          this.arbitrages[0].timestamp / 1_000_000
+        ) {
+          index = -1;
+        }
+
+        const stats: DailyGasStats[] = [];
+        let gasBurnt = 0n;
+        for (let i = index; i >= 0; i--) {
+          const arb = this.arbitrages[i];
+          if (arb.timestamp / 1_000_000 < date.valueOf()) {
+            stats.push({
+              date: date.format('YYYY-MM-DD'),
+              from: date.valueOf(),
+              to: date.endOf('day').valueOf(),
+              gasBurnt: gasBurnt.toString(),
+              nearBurnt: new FixedNumber(gasBurnt, 16).format({
+                maximumFractionDigits: 5
+              })
+            });
+            gasBurnt = 0n;
+            date = date.subtract(1, 'day');
+            if (stats.length === limit) {
+              break;
+            }
+          }
+          gasBurnt += BigInt(arb.gasBurnt);
+        }
+        if (gasBurnt > 0n) {
+          stats.push({
+            date: date.format('YYYY-MM-DD'),
+            from: date.valueOf(),
+            to: date.endOf('day').valueOf(),
+            gasBurnt: gasBurnt.toString(),
+            nearBurnt: new FixedNumber(gasBurnt, 16).format({
+              maximumFractionDigits: 5
+            })
+          });
+        }
+
+        // failures
+        date = startDate;
+
+        index = binarySearch(
+          this.arbitrageFailures,
+          date.endOf('day').valueOf(),
+          (arb, needle) => arb.timestamp / 1_000_000 - needle
+        );
+        index = Math.min(index, this.arbitrageFailures.length - 1);
+        if (
+          date.endOf('day').valueOf() <
+          this.arbitrageFailures[0].timestamp / 1_000_000
+        ) {
+          index = -1;
+        }
+
+        const statsFailures: DailyGasStats[] = [];
+        gasBurnt = 0n;
+        for (let i = index; i >= 0; i--) {
+          const arb = this.arbitrageFailures[i];
+          if (arb.timestamp / 1_000_000 < date.valueOf()) {
+            statsFailures.push({
+              date: date.format('YYYY-MM-DD'),
+              from: date.valueOf(),
+              to: date.endOf('day').valueOf(),
+              gasBurnt: gasBurnt.toString(),
+              nearBurnt: new FixedNumber(gasBurnt, 16).format({
+                maximumFractionDigits: 5
+              })
+            });
+            gasBurnt = 0n;
+            date = date.subtract(1, 'day');
+            if (statsFailures.length === limit) {
+              break;
+            }
+          }
+          gasBurnt += BigInt(arb.gasBurnt);
+        }
+        if (gasBurnt > 0n) {
+          statsFailures.push({
+            date: date.format('YYYY-MM-DD'),
+            from: date.valueOf(),
+            to: date.endOf('day').valueOf(),
+            gasBurnt: gasBurnt.toString(),
+            nearBurnt: new FixedNumber(gasBurnt, 16).format({
+              maximumFractionDigits: 5
+            })
+          });
+        }
+
+        const allStats: DailyGasStats[] = [];
+        for (let i = 0, j = 0; i < stats.length || j < statsFailures.length; ) {
+          if (stats[i].from < statsFailures[j].from) {
+            allStats.push(stats[i]);
+            i++;
+          } else if (stats[i].from > statsFailures[j].from) {
+            allStats.push(statsFailures[j]);
+            j++;
+          } else {
+            allStats.push({
+              date: stats[i].date,
+              from: stats[i].from,
+              to: stats[i].to,
+              gasBurnt: (
+                BigInt(stats[i].gasBurnt) + BigInt(statsFailures[j].gasBurnt)
+              ).toString(),
+              nearBurnt: new FixedNumber(
+                BigInt(stats[i].gasBurnt) + BigInt(statsFailures[j].gasBurnt),
+                16
+              ).format({
+                maximumFractionDigits: 5
+              })
+            });
+            i++;
+            j++;
+          }
+        }
+
+        return c.json(allStats);
       })
       .get('*', async c => {
         const { limit: limitStr, skip: skipStr, status } = c.req.query();
