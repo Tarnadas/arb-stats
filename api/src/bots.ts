@@ -17,8 +17,11 @@ const zDailyProfitStats = z.object({
 type DailyProfitStats = z.infer<typeof zDailyProfitStats>;
 
 const zDailyGasStats = z.object({
-  hourlyTimestamp: z.string(),
-  gas: z.string()
+  date: z.string(),
+  from: z.number(),
+  to: z.number(),
+  gas: z.string(),
+  gasNear: z.string()
 });
 
 type DailyGasStats = z.infer<typeof zDailyGasStats>;
@@ -207,13 +210,15 @@ export class Bots {
   private arbitrages: Arbitrage[];
   private arbitrageFailures: Arbitrage[];
   private index: number;
+  private indexFailures: number;
   private readonly pageSize = 200;
 
   constructor(state: DurableObjectState) {
     this.state = state;
     this.arbitrages = [];
-    this.arbitrageFailures = [];
     this.index = 0;
+    this.arbitrageFailures = [];
+    this.indexFailures = 0;
     this.state.blockConcurrencyWhile(async () => {
       for (; ; this.index++) {
         const arbitrages = await this.state.storage.get<Arbitrage[]>(
@@ -227,13 +232,13 @@ export class Bots {
         }
         this.arbitrages = this.arbitrages.concat(arbitrages);
       }
-      for (; ; this.index++) {
+      for (; ; this.indexFailures++) {
         const arbitrageFailures = await this.state.storage.get<Arbitrage[]>(
-          `arbitrageFailures${this.index}`
+          `arbitrageFailures${this.indexFailures}`
         );
         if (arbitrageFailures == null || arbitrageFailures.length === 0) {
-          if (this.index > 0) {
-            this.index--;
+          if (this.indexFailures > 0) {
+            this.indexFailures--;
           }
           break;
         }
@@ -350,19 +355,27 @@ export class Bots {
         );
         this.arbitrageFailures =
           this.arbitrageFailures.concat(arbitrageFailures);
-        slice = this.arbitrageFailures.slice(this.index * this.pageSize);
+        slice = this.arbitrageFailures.slice(
+          this.indexFailures * this.pageSize
+        );
         if (slice.length > this.pageSize) {
-          this.index++;
-          slice = this.arbitrageFailures.slice(this.index * this.pageSize);
+          this.indexFailures++;
+          slice = this.arbitrageFailures.slice(
+            this.indexFailures * this.pageSize
+          );
         }
-        await this.state.storage.put(`arbitrageFailures${this.index}`, slice);
+        await this.state.storage.put(
+          `arbitrageFailures${this.indexFailures}`,
+          slice
+        );
 
         return new Response(null, { status: 204 });
       })
       .delete('*', async () => {
         this.arbitrages = [];
-        this.arbitrageFailures = [];
         this.index = 0;
+        this.arbitrageFailures = [];
+        this.indexFailures = 0;
         await this.state.storage.deleteAll();
         return new Response(null, { status: 204 });
       });
