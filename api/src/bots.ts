@@ -491,11 +491,10 @@ export class Bots {
         );
         this.arbitrages = this.arbitrages.concat(arbitrageSuccesses);
         let slice = this.arbitrages.slice(this.index * this.pageSize);
+        await this.state.storage.put(`arbitrages${this.index}`, slice);
         if (slice.length > this.pageSize) {
           this.index++;
-          slice = this.arbitrages.slice(this.index * this.pageSize);
         }
-        await this.state.storage.put(`arbitrages${this.index}`, slice);
 
         const arbitrageFailures = events.filter(
           arb => arb.status === 'failure'
@@ -505,16 +504,13 @@ export class Bots {
         slice = this.arbitrageFailures.slice(
           this.indexFailures * this.pageSize
         );
-        if (slice.length > this.pageSize) {
-          this.indexFailures++;
-          slice = this.arbitrageFailures.slice(
-            this.indexFailures * this.pageSize
-          );
-        }
         await this.state.storage.put(
           `arbitrageFailures${this.indexFailures}`,
           slice
         );
+        if (slice.length > this.pageSize) {
+          this.indexFailures++;
+        }
 
         return new Response(null, { status: 204 });
       })
