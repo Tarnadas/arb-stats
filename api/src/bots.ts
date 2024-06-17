@@ -55,7 +55,7 @@ bots
           bot_id: botIds
         }),
         query: z.object({
-          limit: z.coerce.number().max(20).default(20).optional(),
+          limit: z.coerce.number().max(7).default(7).optional(),
           skip: z.coerce.number().default(0).optional()
         })
       },
@@ -75,7 +75,7 @@ bots
       const addr = c.env.BOTS.idFromName(botId);
       const obj = c.env.BOTS.get(addr);
       let { limit, skip } = c.req.query();
-      limit = limit || '20';
+      limit = limit || '7';
       skip = skip || '0';
       const res = await obj.fetch(
         `${new URL(c.req.url).origin}/daily/profit?limit=${limit}&skip=${skip}`
@@ -94,7 +94,7 @@ bots
           bot_id: botIds
         }),
         query: z.object({
-          limit: z.coerce.number().max(20).default(20).optional(),
+          limit: z.coerce.number().max(7).default(7).optional(),
           skip: z.coerce.number().default(0).optional()
         })
       },
@@ -114,7 +114,7 @@ bots
       const addr = c.env.BOTS.idFromName(botId);
       const obj = c.env.BOTS.get(addr);
       let { limit, skip } = c.req.query();
-      limit = limit || '20';
+      limit = limit || '7';
       skip = skip || '0';
       const res = await obj.fetch(
         `${new URL(c.req.url).origin}/daily/gas?limit=${limit}&skip=${skip}`
