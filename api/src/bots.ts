@@ -490,10 +490,23 @@ export class Bots {
           arb => arb.status === 'success'
         );
         this.arbitrages = this.arbitrages.concat(arbitrageSuccesses);
-        let slice = this.arbitrages.slice(this.index * this.pageSize);
+        let slice = this.arbitrages.slice(
+          this.index * this.pageSize,
+          (this.index + 1) * this.pageSize
+        );
         await this.state.storage.put(`arbitrages${this.index}`, slice);
-        if (slice.length > this.pageSize) {
-          this.index++;
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+          slice = this.arbitrages.slice(
+            (this.index + 1) * this.pageSize,
+            (this.index + 2) * this.pageSize
+          );
+          if (slice.length > 0) {
+            this.index++;
+            await this.state.storage.put(`arbitrages${this.index}`, slice);
+          } else {
+            break;
+          }
         }
 
         const arbitrageFailures = events.filter(
@@ -502,14 +515,28 @@ export class Bots {
         this.arbitrageFailures =
           this.arbitrageFailures.concat(arbitrageFailures);
         slice = this.arbitrageFailures.slice(
-          this.indexFailures * this.pageSize
+          this.indexFailures * this.pageSize,
+          (this.indexFailures + 1) * this.pageSize
         );
         await this.state.storage.put(
           `arbitrageFailures${this.indexFailures}`,
           slice
         );
-        if (slice.length > this.pageSize) {
-          this.indexFailures++;
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+          slice = this.arbitrageFailures.slice(
+            (this.indexFailures + 1) * this.pageSize,
+            (this.indexFailures + 2) * this.pageSize
+          );
+          if (slice.length > 0) {
+            this.indexFailures++;
+            await this.state.storage.put(
+              `arbitrageFailures${this.indexFailures}`,
+              slice
+            );
+          } else {
+            break;
+          }
         }
 
         return new Response(null, { status: 204 });
