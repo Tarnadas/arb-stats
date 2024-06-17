@@ -212,10 +212,16 @@ export class BotIds {
 export class Bots {
   private state: DurableObjectState;
   private app: Hono;
+
   private arbitrages: Arbitrage[];
-  private arbitrageFailures: Arbitrage[];
   private index: number;
+
+  private arbitrageFailures: Arbitrage[];
   private indexFailures: number;
+
+  private dailyProfitsCache: Record<string, DailyProfitStats> = {};
+  private dailyGasCache: Record<string, DailyGasStats> = {};
+
   private readonly pageSize = 200;
 
   constructor(state: DurableObjectState) {
@@ -280,18 +286,40 @@ export class Bots {
 
         const stats: DailyProfitStats[] = [];
         let profits = 0n;
-        for (let i = index; i >= 0; i--) {
+        let isFirst = true;
+        for (let i = index; i >= 0; i--, isFirst = false) {
           const arb = this.arbitrages[i];
+          const formattedDate = date.format('YYYY-MM-DD');
+          if (
+            !isFirst &&
+            stats.length > 0 &&
+            this.dailyProfitsCache[formattedDate] != null
+          ) {
+            if (stats[stats.length - 1].date !== formattedDate) {
+              stats.push(this.dailyProfitsCache[formattedDate]);
+            }
+            if (arb.timestamp / 1_000_000 < date.valueOf()) {
+              date = date.subtract(1, 'day');
+            }
+            if (stats.length === limit) {
+              break;
+            }
+            continue;
+          }
           if (arb.timestamp / 1_000_000 < date.valueOf()) {
-            stats.push({
-              date: date.format('YYYY-MM-DD'),
+            const arbStats = {
+              date: formattedDate,
               from: date.valueOf(),
               to: date.endOf('day').valueOf(),
               profits: profits.toString(),
               profitsNear: new FixedNumber(profits, 24).format({
                 maximumFractionDigits: 3
               })
-            });
+            };
+            if (stats.length > 0) {
+              this.dailyProfitsCache[formattedDate] = arbStats;
+            }
+            stats.push(arbStats);
             profits = 0n;
             date = date.subtract(1, 'day');
             if (stats.length === limit) {
@@ -303,15 +331,20 @@ export class Bots {
           }
         }
         if (profits > 0n) {
-          stats.push({
-            date: date.format('YYYY-MM-DD'),
+          const formattedDate = date.format('YYYY-MM-DD');
+          const arbStats = {
+            date: formattedDate,
             from: date.valueOf(),
             to: date.endOf('day').valueOf(),
             profits: profits.toString(),
             profitsNear: new FixedNumber(profits, 24).format({
               maximumFractionDigits: 3
             })
-          });
+          };
+          if (stats.length > 0) {
+            this.dailyProfitsCache[formattedDate] = arbStats;
+          }
+          stats.push(arbStats);
         }
 
         return c.json(stats);
