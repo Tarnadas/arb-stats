@@ -330,7 +330,7 @@ export class Bots {
             profits += BigInt(arb.profit);
           }
         }
-        if (profits > 0n) {
+        if (profits > 0n && stats.length < limit) {
           const formattedDate = date.format('YYYY-MM-DD');
           const arbStats = {
             date: formattedDate,
@@ -403,7 +403,7 @@ export class Bots {
           }
           gasBurnt += BigInt(arb.gasBurnt);
         }
-        if (gasBurnt > 0n) {
+        if (gasBurnt > 0n && stats.length < limit) {
           stats.push({
             date: date.format('YYYY-MM-DD'),
             from: date.valueOf(),
@@ -453,7 +453,7 @@ export class Bots {
           }
           gasBurnt += BigInt(arb.gasBurnt);
         }
-        if (gasBurnt > 0n) {
+        if (gasBurnt > 0n && statsFailures.length < limit) {
           statsFailures.push({
             date: date.format('YYYY-MM-DD'),
             from: date.valueOf(),
