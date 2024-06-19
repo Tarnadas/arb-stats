@@ -47,7 +47,8 @@ export const bots = new OpenAPIHono();
 bots
   .openapi(
     createRoute({
-      description: 'Returns daily arbitrage statistics',
+      description:
+        'Returns daily arbitrage statistics. Can fetch at most 7 days. Keep date params empty to fetch latest data.',
       method: 'get',
       path: '/{bot_id}/daily/profit',
       request: {
@@ -56,12 +57,10 @@ bots
         }),
         query: z.object({
           startDate: z.string().date().optional().openapi({
-            description: 'format: `YYYY-MM-DD`',
-            example: '2024-04-15'
+            description: 'format: `YYYY-MM-DD`'
           }),
           endDate: z.string().date().optional().openapi({
-            description: 'format: `YYYY-MM-DD`',
-            example: '2024-04-22'
+            description: 'format: `YYYY-MM-DD`'
           })
         })
       },
@@ -112,7 +111,7 @@ bots
         if (startDate.isAfter(endDate)) {
           return c.text('`startDate` is after `endDate`', 400);
         }
-        if (startDate.diff(endDate, 'day') >= 7) {
+        if (endDate.diff(startDate, 'day') >= 7) {
           return c.text('can only fetch at most 7 days', 400);
         }
       }
@@ -131,7 +130,8 @@ bots
   )
   .openapi(
     createRoute({
-      description: 'Returns daily gas usage',
+      description:
+        'Returns daily gas usage. Can fetch at most 7 days. Keep date params empty to fetch latest data.',
       method: 'get',
       path: '/{bot_id}/daily/gas',
       request: {
@@ -139,12 +139,10 @@ bots
           bot_id: botIds
         }),
         startDate: z.string().date().optional().openapi({
-          description: 'format: `YYYY-MM-DD`',
-          example: '2024-04-15'
+          description: 'format: `YYYY-MM-DD`'
         }),
         endDate: z.string().date().optional().openapi({
-          description: 'format: `YYYY-MM-DD`',
-          example: '2024-04-22'
+          description: 'format: `YYYY-MM-DD`'
         })
       },
       responses: {
@@ -194,7 +192,7 @@ bots
         if (startDate.isAfter(endDate)) {
           return c.text('`startDate` is after `endDate`', 400);
         }
-        if (startDate.diff(endDate, 'day') >= 7) {
+        if (endDate.diff(startDate, 'day') >= 7) {
           return c.text('can only fetch at most 7 days', 400);
         }
       }
