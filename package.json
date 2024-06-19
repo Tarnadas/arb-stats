@@ -1,7 +1,8 @@
 {
   "private": true,
   "workspaces": [
-    "api"
+    "api",
+    "app"
   ],
   "engines": {
     "node": ">= 20"
@@ -10,7 +11,8 @@
   "license": "MIT",
   "scripts": {
     "api": "yarn workspace api",
-    "lint": "eslint --max-warnings=0 && prettier --check .",
+    "app": "yarn workspace app",
+    "lint": "eslint --max-warnings=0 --ignore-path .gitignore --cache --cache-location ./node_modules/.cache/eslin && prettier --check .",
     "format": "prettier --write ."
   },
   "devDependencies": {

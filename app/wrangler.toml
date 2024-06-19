@@ -1,0 +1,16 @@
+name = "arb"
+
+main = "./server.js"
+workers_dev = true
+# https://developers.cloudflare.com/workers/platform/compatibility-dates
+compatibility_date = "2023-04-20"
+
+routes = [
+	{ pattern = "arb.shitzuapes.xyz", custom_domain = true }
+]
+
+[site]
+bucket = "./build/client"
+
+[build]
+command = "yarn build"
