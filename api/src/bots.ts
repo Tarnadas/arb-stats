@@ -55,8 +55,14 @@ bots
           bot_id: botIds
         }),
         query: z.object({
-          startDate: z.string().date().optional(),
-          endDate: z.string().date().optional()
+          startDate: z.string().date().optional().openapi({
+            description: 'format: `YYYY-MM-DD`',
+            example: '2024-04-15'
+          }),
+          endDate: z.string().date().optional().openapi({
+            description: 'format: `YYYY-MM-DD`',
+            example: '2024-04-22'
+          })
         })
       },
       responses: {
@@ -132,9 +138,13 @@ bots
         params: z.object({
           bot_id: botIds
         }),
-        query: z.object({
-          startDate: z.string().date().optional(),
-          endDate: z.string().date().optional()
+        startDate: z.string().date().optional().openapi({
+          description: 'format: `YYYY-MM-DD`',
+          example: '2024-04-15'
+        }),
+        endDate: z.string().date().optional().openapi({
+          description: 'format: `YYYY-MM-DD`',
+          example: '2024-04-22'
         })
       },
       responses: {
