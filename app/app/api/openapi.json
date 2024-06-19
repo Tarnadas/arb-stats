@@ -1,0 +1,273 @@
+{
+  "openapi": "3.0.0",
+  "info": { "version": "1.0.0", "title": "Arbitrage Bot Stats API" },
+  "components": { "schemas": {}, "parameters": {} },
+  "paths": {
+    "/info": {
+      "get": {
+        "description": "Returns latest indexed block height",
+        "responses": {
+          "200": {
+            "description": "latest indexed block height",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "lastBlockHeight": { "type": "number" } },
+                  "required": ["lastBlockHeight"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/bots/{bot_id}/daily/profit": {
+      "get": {
+        "description": "Returns daily arbitrage statistics. Can fetch at most 7 days. Keep date params empty to fetch latest data.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "bot.marior.near",
+                "bot0.marior.near",
+                "bot2.marior.near",
+                "bot3.marior.near",
+                "bot4.marior.near",
+                "bot5.marior.near",
+                "bot6.marior.near",
+                "aldor.near",
+                "frisky.near",
+                "sneaky1.near",
+                "kagool.near",
+                "zalevsky.near",
+                "foxboss.near",
+                "xy_k.near",
+                "shitake.near"
+              ]
+            },
+            "required": true,
+            "name": "bot_id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "format: `YYYY-MM-DD`"
+            },
+            "required": false,
+            "name": "startDate",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "format: `YYYY-MM-DD`"
+            },
+            "required": false,
+            "name": "endDate",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "daily arbitrage statistics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "date": { "type": "string" },
+                      "from": { "type": "number" },
+                      "to": { "type": "number" },
+                      "profits": { "type": "string" },
+                      "profitsNear": { "type": "string" }
+                    },
+                    "required": ["date", "from", "to", "profits", "profitsNear"]
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`startDate` and `endDate` are invalid",
+            "content": { "text/plain": { "schema": { "type": "string" } } }
+          },
+          "404": { "description": "No data available" },
+          "500": { "description": "Unexpected server error" }
+        }
+      }
+    },
+    "/bots/{bot_id}/daily/gas": {
+      "get": {
+        "description": "Returns daily gas usage. Can fetch at most 7 days. Keep date params empty to fetch latest data.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "bot.marior.near",
+                "bot0.marior.near",
+                "bot2.marior.near",
+                "bot3.marior.near",
+                "bot4.marior.near",
+                "bot5.marior.near",
+                "bot6.marior.near",
+                "aldor.near",
+                "frisky.near",
+                "sneaky1.near",
+                "kagool.near",
+                "zalevsky.near",
+                "foxboss.near",
+                "xy_k.near",
+                "shitake.near"
+              ]
+            },
+            "required": true,
+            "name": "bot_id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "daily gas usage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "date": { "type": "string" },
+                      "from": { "type": "number" },
+                      "to": { "type": "number" },
+                      "gasBurnt": { "type": "string" },
+                      "nearBurnt": { "type": "string" }
+                    },
+                    "required": ["date", "from", "to", "gasBurnt", "nearBurnt"]
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`startDate` and `endDate` are invalid",
+            "content": { "text/plain": { "schema": { "type": "string" } } }
+          },
+          "404": { "description": "No data available" },
+          "500": { "description": "Unexpected server error" }
+        }
+      }
+    },
+    "/bots/{bot_id}": {
+      "get": {
+        "description": "Returns all arbitrage trades filtered by success value",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "bot.marior.near",
+                "bot0.marior.near",
+                "bot2.marior.near",
+                "bot3.marior.near",
+                "bot4.marior.near",
+                "bot5.marior.near",
+                "bot6.marior.near",
+                "aldor.near",
+                "frisky.near",
+                "sneaky1.near",
+                "kagool.near",
+                "zalevsky.near",
+                "foxboss.near",
+                "xy_k.near",
+                "shitake.near"
+              ]
+            },
+            "required": true,
+            "name": "bot_id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": ["success", "failure"],
+              "default": "success"
+            },
+            "required": false,
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": { "type": "string" },
+            "required": true,
+            "name": "date",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "arbitrage trades",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "senderId": { "type": "string" },
+                          "blockHeight": { "type": "number" },
+                          "timestamp": { "type": "number" },
+                          "txHash": { "type": "string" },
+                          "gasBurnt": { "type": "number" },
+                          "profit": { "type": "string" },
+                          "status": { "type": "string", "enum": ["success"] }
+                        },
+                        "required": [
+                          "senderId",
+                          "blockHeight",
+                          "timestamp",
+                          "txHash",
+                          "gasBurnt",
+                          "profit",
+                          "status"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "senderId": { "type": "string" },
+                          "blockHeight": { "type": "number" },
+                          "timestamp": { "type": "number" },
+                          "txHash": { "type": "string" },
+                          "gasBurnt": { "type": "number" },
+                          "status": { "type": "string", "enum": ["failure"] }
+                        },
+                        "required": [
+                          "senderId",
+                          "blockHeight",
+                          "timestamp",
+                          "txHash",
+                          "gasBurnt",
+                          "status"
+                        ]
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`limit` and `skip` search param must be an integer"
+          }
+        }
+      }
+    }
+  }
+}
