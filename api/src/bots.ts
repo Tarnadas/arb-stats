@@ -133,8 +133,8 @@ bots
           bot_id: botIds
         }),
         query: z.object({
-          limit: z.coerce.number().max(7).default(7).optional(),
-          skip: z.coerce.number().default(0).optional()
+          startDate: z.string().date().optional(),
+          endDate: z.string().date().optional()
         })
       },
       responses: {
@@ -145,6 +145,20 @@ bots
             }
           },
           description: 'daily gas usage'
+        },
+        400: {
+          description: '`startDate` and `endDate` are invalid',
+          content: {
+            'text/plain': {
+              schema: z.string()
+            }
+          }
+        },
+        404: {
+          description: 'No data available'
+        },
+        500: {
+          description: 'Unexpected server error'
         }
       }
     }),
@@ -152,14 +166,39 @@ bots
       const botId = c.req.param('bot_id');
       const addr = c.env.BOTS.idFromName(botId);
       const obj = c.env.BOTS.get(addr);
-      let { limit, skip } = c.req.query();
-      limit = limit || '7';
-      skip = skip || '0';
+      const { startDate: startDateStr, endDate: endDateStr } = c.req.query();
+      let startDate: dayjs.Dayjs | undefined;
+      if (startDateStr) {
+        startDate = dayjs.utc(startDateStr);
+      }
+      let endDate: dayjs.Dayjs | undefined;
+      if (endDateStr) {
+        endDate = dayjs.utc(endDateStr);
+      } else if (startDate != null) {
+        endDate = startDate.add(7, 'days');
+      }
+      if (startDate == null && endDate != null) {
+        startDate = endDate.subtract(7, 'days');
+      }
+      if (startDate != null && endDate != null) {
+        if (startDate.isAfter(endDate)) {
+          return c.text('`startDate` is after `endDate`', 400);
+        }
+        if (startDate.diff(endDate, 'day') >= 7) {
+          return c.text('can only fetch at most 7 days', 400);
+        }
+      }
+
       const res = await obj.fetch(
-        `${new URL(c.req.url).origin}/daily/gas?limit=${limit}&skip=${skip}`
+        `${new URL(c.req.url).origin}/daily/gas?startDate=${startDateStr ?? ''}&endDate=${endDateStr ?? ''}`
       );
-      const game = await res.json<DailyGasStats[]>();
-      return c.json(game);
+      if (res.status === 404) {
+        return c.text('No data available', 404);
+      } else if (res.status === 500) {
+        return c.text('Unexpected server error', 500);
+      }
+      const arbs = await res.json<DailyGasStats[]>();
+      return c.json(arbs);
     }
   )
   .openapi(
@@ -302,12 +341,53 @@ export class Bots {
 
         return c.json(stats);
       })
-      .get('/daily/gas', async () => {
+      .get('/daily/gas', async c => {
         if (this.currentDate == null) {
           return new Response(null, { status: 404 });
         }
 
-        return new Response(null, { status: 503 });
+        const { startDate: startDateStr, endDate: endDateStr } = c.req.query();
+        let endDate: dayjs.Dayjs;
+        if (endDateStr) {
+          endDate = dayjs.utc(endDateStr).add(1, 'day');
+        } else {
+          endDate = dayjs.utc(this.currentDate).add(1, 'day');
+        }
+        let date: dayjs.Dayjs;
+        if (startDateStr) {
+          date = dayjs.utc(startDateStr);
+        } else {
+          date = endDate.subtract(7, 'days');
+        }
+
+        const stats: DailyGasStats[] = [];
+        for (; date.isBefore(endDate); date = date.add(1, 'day')) {
+          const formattedDate = date.format('YYYY-MM-DD');
+          let gasBurnt = 0n;
+          const arbs = await this.lazyLoadArbDate(date);
+          for (const arb of arbs) {
+            gasBurnt += BigInt(arb.gasBurnt);
+          }
+          const arbFailures = await this.lazyLoadArbFailureDate(date);
+          for (const arb of arbFailures) {
+            gasBurnt += BigInt(arb.gasBurnt);
+          }
+          const arbStats = {
+            date: formattedDate,
+            from: date.valueOf(),
+            to: date.endOf('day').valueOf(),
+            gasBurnt: gasBurnt.toString(),
+            nearBurnt: new FixedNumber(gasBurnt, 16).format({
+              maximumFractionDigits: 5
+            })
+          } satisfies DailyGasStats;
+          if (this.currentDate !== formattedDate) {
+            this.dailyGasCache[formattedDate] = arbStats;
+          }
+          stats.push(arbStats);
+        }
+
+        return c.json(stats);
       })
       .get('*', async c => {
         if (this.currentDate == null) {
