@@ -28,3 +28,11 @@ deleted_classes = ["Info", "Bots", "BotIds"]
 [[migrations]]
 tag = "v3"
 new_classes = ["Info", "Bots", "BotIds"]
+
+[[migrations]]
+tag = "v4"
+deleted_classes = ["Info", "Bots", "BotIds"]
+
+[[migrations]]
+tag = "v5"
+new_classes = ["Info", "Bots", "BotIds"]

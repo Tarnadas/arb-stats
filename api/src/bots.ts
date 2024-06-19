@@ -4,7 +4,6 @@ import dayjs from 'dayjs';
 import { Hono } from 'hono';
 
 import { Arbitrage, zArbitrage } from './events';
-import { binarySearch } from './util';
 
 const zDailyProfitStats = z.object({
   date: z.string(),
@@ -40,7 +39,8 @@ const botIds = z.enum([
   'kagool.near',
   'zalevsky.near',
   'foxboss.near',
-  'xy_k.near'
+  'xy_k.near',
+  'shitake.near'
 ]);
 
 export const bots = new OpenAPIHono();
@@ -55,18 +55,32 @@ bots
           bot_id: botIds
         }),
         query: z.object({
-          limit: z.coerce.number().max(7).default(7).optional(),
-          skip: z.coerce.number().default(0).optional()
+          startDate: z.string().date().optional(),
+          endDate: z.string().date().optional()
         })
       },
       responses: {
         200: {
+          description: 'daily arbitrage statistics',
           content: {
             'application/json': {
               schema: zDailyProfitStats.array()
             }
-          },
-          description: 'daily arbitrage statistics'
+          }
+        },
+        400: {
+          description: '`startDate` and `endDate` are invalid',
+          content: {
+            'text/plain': {
+              schema: z.string()
+            }
+          }
+        },
+        404: {
+          description: 'No data available'
+        },
+        500: {
+          description: 'Unexpected server error'
         }
       }
     }),
@@ -74,14 +88,39 @@ bots
       const botId = c.req.param('bot_id');
       const addr = c.env.BOTS.idFromName(botId);
       const obj = c.env.BOTS.get(addr);
-      let { limit, skip } = c.req.query();
-      limit = limit || '7';
-      skip = skip || '0';
+      const { startDate: startDateStr, endDate: endDateStr } = c.req.query();
+      let startDate: dayjs.Dayjs | undefined;
+      if (startDateStr) {
+        startDate = dayjs.utc(startDateStr);
+      }
+      let endDate: dayjs.Dayjs | undefined;
+      if (endDateStr) {
+        endDate = dayjs.utc(endDateStr);
+      } else if (startDate != null) {
+        endDate = startDate.add(7, 'days');
+      }
+      if (startDate == null && endDate != null) {
+        startDate = endDate.subtract(7, 'days');
+      }
+      if (startDate != null && endDate != null) {
+        if (startDate.isAfter(endDate)) {
+          return c.text('`startDate` is after `endDate`', 400);
+        }
+        if (startDate.diff(endDate, 'day') >= 7) {
+          return c.text('can only fetch at most 7 days', 400);
+        }
+      }
+
       const res = await obj.fetch(
-        `${new URL(c.req.url).origin}/daily/profit?limit=${limit}&skip=${skip}`
+        `${new URL(c.req.url).origin}/daily/profit?startDate=${startDateStr ?? ''}&endDate=${endDateStr ?? ''}`
       );
-      const game = await res.json<DailyProfitStats[]>();
-      return c.json(game);
+      if (res.status === 404) {
+        return c.text('No data available', 404);
+      } else if (res.status === 500) {
+        return c.text('Unexpected server error', 500);
+      }
+      const arbs = await res.json<DailyProfitStats[]>();
+      return c.json(arbs);
     }
   )
   .openapi(
@@ -134,8 +173,7 @@ bots
         }),
         query: z.object({
           status: z.enum(['success', 'failure']).default('success').optional(),
-          limit: z.coerce.number().max(100).default(100).optional(),
-          skip: z.coerce.number().default(0).optional()
+          date: z.string().date()
         })
       },
       responses: {
@@ -156,21 +194,9 @@ bots
       const botId = c.req.param('bot_id');
       const addr = c.env.BOTS.idFromName(botId);
       const obj = c.env.BOTS.get(addr);
-      let { limit, skip, status } = c.req.query();
-      limit = limit || '100';
-      skip = skip || '0';
-      status = status || 'success';
-      try {
-        parseInt(limit);
-        parseInt(skip);
-      } catch (err) {
-        return new Response(
-          '`limit` and `skip` search param must be an integer',
-          { status: 400 }
-        );
-      }
+      const { date: dateStr, status } = c.req.query();
       const res = await obj.fetch(
-        `${new URL(c.req.url).origin}?limit=${limit}&skip=${skip}&status=${status}`
+        `${new URL(c.req.url).origin}?date=${dateStr}&status=${status || 'success'}`
       );
       const arbitrages = await res.json<Arbitrage[]>();
       return c.json(arbitrages);
@@ -213,125 +239,52 @@ export class Bots {
   private state: DurableObjectState;
   private app: Hono;
 
-  private arbitrages: Arbitrage[];
-  private index: number;
-
-  private arbitrageFailures: Arbitrage[];
-  private indexFailures: number;
+  private currentDate?: string;
+  private arbitrages: Record<string, Arbitrage[] | undefined>;
+  private arbitrageFailures: Record<string, Arbitrage[] | undefined>;
 
   private dailyProfitsCache: Record<string, DailyProfitStats> = {};
   private dailyGasCache: Record<string, DailyGasStats> = {};
 
-  private readonly pageSize = 200;
-
   constructor(state: DurableObjectState) {
     this.state = state;
-    this.arbitrages = [];
-    this.index = 0;
-    this.arbitrageFailures = [];
-    this.indexFailures = 0;
+    this.arbitrages = {};
+    this.arbitrageFailures = {};
     this.state.blockConcurrencyWhile(async () => {
-      for (; ; this.index++) {
-        const arbitrages = await this.state.storage.get<Arbitrage[]>(
-          `arbitrages${this.index}`
-        );
-        if (arbitrages == null || arbitrages.length === 0) {
-          if (this.index > 0) {
-            this.index--;
-          }
-          break;
-        }
-        this.arbitrages = this.arbitrages.concat(arbitrages);
-      }
-      for (; ; this.indexFailures++) {
-        const arbitrageFailures = await this.state.storage.get<Arbitrage[]>(
-          `arbitrageFailures${this.indexFailures}`
-        );
-        if (arbitrageFailures == null || arbitrageFailures.length === 0) {
-          if (this.indexFailures > 0) {
-            this.indexFailures--;
-          }
-          break;
-        }
-        this.arbitrageFailures =
-          this.arbitrageFailures.concat(arbitrageFailures);
-      }
+      this.currentDate = await this.state.storage.get('currentDate');
     });
 
     this.app = new Hono();
     this.app
       .get('/daily/profit', async c => {
-        const { limit: limitStr, skip: skipStr } = c.req.query();
-        const limit = Number(limitStr);
-        const skip = Number(skipStr);
+        if (this.currentDate == null) {
+          return new Response(null, { status: 404 });
+        }
 
-        let date = dayjs.utc(
-          this.arbitrages[this.arbitrages.length - 1].timestamp / 1_000_000
-        );
-        date = date.subtract(skip, 'days');
-        date = date.startOf('day');
-
-        let index = binarySearch(
-          this.arbitrages,
-          date.endOf('day').valueOf(),
-          (arb, needle) => arb.timestamp / 1_000_000 - needle
-        );
-        index = Math.min(index, this.arbitrages.length - 1);
-        if (
-          date.endOf('day').valueOf() <
-          this.arbitrages[0].timestamp / 1_000_000
-        ) {
-          index = -1;
+        const { startDate: startDateStr, endDate: endDateStr } = c.req.query();
+        let endDate: dayjs.Dayjs;
+        if (endDateStr) {
+          endDate = dayjs.utc(endDateStr).add(1, 'day');
+        } else {
+          endDate = dayjs.utc(this.currentDate).add(1, 'day');
+        }
+        let date: dayjs.Dayjs;
+        if (startDateStr) {
+          date = dayjs.utc(startDateStr);
+        } else {
+          date = endDate.subtract(7, 'days');
         }
 
         const stats: DailyProfitStats[] = [];
-        let profits = 0n;
-        let isFirst = true;
-        for (let i = index; i >= 0; i--, isFirst = false) {
-          const arb = this.arbitrages[i];
+        for (; date.isBefore(endDate); date = date.add(1, 'day')) {
           const formattedDate = date.format('YYYY-MM-DD');
-          if (
-            !isFirst &&
-            stats.length > 0 &&
-            this.dailyProfitsCache[formattedDate] != null
-          ) {
-            if (stats[stats.length - 1].date !== formattedDate) {
-              stats.push(this.dailyProfitsCache[formattedDate]);
-            }
-            if (arb.timestamp / 1_000_000 < date.valueOf()) {
-              date = date.subtract(1, 'day');
-            }
-            if (stats.length === limit) {
-              break;
-            }
-            continue;
-          }
-          if (arb.timestamp / 1_000_000 < date.valueOf()) {
-            const arbStats = {
-              date: formattedDate,
-              from: date.valueOf(),
-              to: date.endOf('day').valueOf(),
-              profits: profits.toString(),
-              profitsNear: new FixedNumber(profits, 24).format({
-                maximumFractionDigits: 3
-              })
-            };
-            if (stats.length > 0) {
-              this.dailyProfitsCache[formattedDate] = arbStats;
-            }
-            stats.push(arbStats);
-            profits = 0n;
-            date = date.subtract(1, 'day');
-            if (stats.length === limit) {
-              break;
+          let profits = 0n;
+          const arbs = await this.lazyLoadArbDate(date);
+          for (const arb of arbs) {
+            if (arb.status === 'success') {
+              profits += BigInt(arb.profit);
             }
           }
-          if (arb.status === 'success') {
-            profits += BigInt(arb.profit);
-          }
-        }
-        if (profits > 0n && stats.length < limit) {
-          const formattedDate = date.format('YYYY-MM-DD');
           const arbStats = {
             date: formattedDate,
             from: date.valueOf(),
@@ -341,7 +294,7 @@ export class Bots {
               maximumFractionDigits: 3
             })
           };
-          if (stats.length > 0) {
+          if (this.currentDate !== formattedDate) {
             this.dailyProfitsCache[formattedDate] = arbStats;
           }
           stats.push(arbStats);
@@ -349,171 +302,27 @@ export class Bots {
 
         return c.json(stats);
       })
-      .get('/daily/gas', async c => {
-        const { limit: limitStr, skip: skipStr } = c.req.query();
-        const limit = Number(limitStr);
-        const skip = Number(skipStr);
-
-        let date = dayjs.utc(
-          this.arbitrages[this.arbitrages.length - 1].timestamp / 1_000_000
-        );
-        const dateFailures = dayjs.utc(
-          this.arbitrageFailures[this.arbitrageFailures.length - 1].timestamp /
-            1_000_000
-        );
-        if (dateFailures.isBefore(date)) {
-          date = dateFailures;
-        }
-        date = date.subtract(skip, 'days');
-        date = date.startOf('day');
-        const startDate = date.clone();
-
-        let index = binarySearch(
-          this.arbitrages,
-          date.endOf('day').valueOf(),
-          (arb, needle) => arb.timestamp / 1_000_000 - needle
-        );
-        index = Math.min(index, this.arbitrages.length - 1);
-        if (
-          date.endOf('day').valueOf() <
-          this.arbitrages[0].timestamp / 1_000_000
-        ) {
-          index = -1;
+      .get('/daily/gas', async () => {
+        if (this.currentDate == null) {
+          return new Response(null, { status: 404 });
         }
 
-        const stats: DailyGasStats[] = [];
-        let gasBurnt = 0n;
-        for (let i = index; i >= 0; i--) {
-          const arb = this.arbitrages[i];
-          if (arb.timestamp / 1_000_000 < date.valueOf()) {
-            stats.push({
-              date: date.format('YYYY-MM-DD'),
-              from: date.valueOf(),
-              to: date.endOf('day').valueOf(),
-              gasBurnt: gasBurnt.toString(),
-              nearBurnt: new FixedNumber(gasBurnt, 16).format({
-                maximumFractionDigits: 5
-              })
-            });
-            gasBurnt = 0n;
-            date = date.subtract(1, 'day');
-            if (stats.length === limit) {
-              break;
-            }
-          }
-          gasBurnt += BigInt(arb.gasBurnt);
-        }
-        if (gasBurnt > 0n && stats.length < limit) {
-          stats.push({
-            date: date.format('YYYY-MM-DD'),
-            from: date.valueOf(),
-            to: date.endOf('day').valueOf(),
-            gasBurnt: gasBurnt.toString(),
-            nearBurnt: new FixedNumber(gasBurnt, 16).format({
-              maximumFractionDigits: 5
-            })
-          });
-        }
-
-        // failures
-        date = startDate;
-
-        index = binarySearch(
-          this.arbitrageFailures,
-          date.endOf('day').valueOf(),
-          (arb, needle) => arb.timestamp / 1_000_000 - needle
-        );
-        index = Math.min(index, this.arbitrageFailures.length - 1);
-        if (
-          date.endOf('day').valueOf() <
-          this.arbitrageFailures[0].timestamp / 1_000_000
-        ) {
-          index = -1;
-        }
-
-        const statsFailures: DailyGasStats[] = [];
-        gasBurnt = 0n;
-        for (let i = index; i >= 0; i--) {
-          const arb = this.arbitrageFailures[i];
-          if (arb.timestamp / 1_000_000 < date.valueOf()) {
-            statsFailures.push({
-              date: date.format('YYYY-MM-DD'),
-              from: date.valueOf(),
-              to: date.endOf('day').valueOf(),
-              gasBurnt: gasBurnt.toString(),
-              nearBurnt: new FixedNumber(gasBurnt, 16).format({
-                maximumFractionDigits: 5
-              })
-            });
-            gasBurnt = 0n;
-            date = date.subtract(1, 'day');
-            if (statsFailures.length === limit) {
-              break;
-            }
-          }
-          gasBurnt += BigInt(arb.gasBurnt);
-        }
-        if (gasBurnt > 0n && statsFailures.length < limit) {
-          statsFailures.push({
-            date: date.format('YYYY-MM-DD'),
-            from: date.valueOf(),
-            to: date.endOf('day').valueOf(),
-            gasBurnt: gasBurnt.toString(),
-            nearBurnt: new FixedNumber(gasBurnt, 16).format({
-              maximumFractionDigits: 5
-            })
-          });
-        }
-
-        const allStats: DailyGasStats[] = [];
-        for (let i = 0, j = 0; i < stats.length || j < statsFailures.length; ) {
-          if (stats[i].from < statsFailures[j].from) {
-            allStats.push(stats[i]);
-            i++;
-          } else if (stats[i].from > statsFailures[j].from) {
-            allStats.push(statsFailures[j]);
-            j++;
-          } else {
-            allStats.push({
-              date: stats[i].date,
-              from: stats[i].from,
-              to: stats[i].to,
-              gasBurnt: (
-                BigInt(stats[i].gasBurnt) + BigInt(statsFailures[j].gasBurnt)
-              ).toString(),
-              nearBurnt: new FixedNumber(
-                BigInt(stats[i].gasBurnt) + BigInt(statsFailures[j].gasBurnt),
-                16
-              ).format({
-                maximumFractionDigits: 5
-              })
-            });
-            i++;
-            j++;
-          }
-        }
-
-        return c.json(allStats);
+        return new Response(null, { status: 503 });
       })
       .get('*', async c => {
-        const { limit: limitStr, skip: skipStr, status } = c.req.query();
-        const limit = Number(limitStr);
-        const skip = Number(skipStr);
+        if (this.currentDate == null) {
+          return new Response(null, { status: 404 });
+        }
+
+        const { date: dateStr, status } = c.req.query();
+        const date = dayjs.utc(dateStr);
 
         if (status === 'failure') {
-          const length = this.arbitrageFailures.length;
-          const slice = this.arbitrageFailures
-            .slice(length - limit - skip, length - skip)
-            .reverse();
-
-          return c.json(slice);
+          const arbs = await this.lazyLoadArbFailureDate(date);
+          return c.json(arbs);
         } else {
-          const length = this.arbitrages.length;
-          const slice = this.arbitrages
-            .slice(length - limit - skip, length - skip)
-            .reverse();
-
-          return c.json(slice);
+          const arbs = await this.lazyLoadArbDate(date);
+          return c.json(arbs);
         }
       })
       .post('*', async c => {
@@ -522,63 +331,56 @@ export class Bots {
         const arbitrageSuccesses = events.filter(
           arb => arb.status === 'success'
         );
-        this.arbitrages = this.arbitrages.concat(arbitrageSuccesses);
-        let slice = this.arbitrages.slice(
-          this.index * this.pageSize,
-          (this.index + 1) * this.pageSize
-        );
-        await this.state.storage.put(`arbitrages${this.index}`, slice);
-        // eslint-disable-next-line no-constant-condition
-        while (true) {
-          slice = this.arbitrages.slice(
-            (this.index + 1) * this.pageSize,
-            (this.index + 2) * this.pageSize
-          );
-          if (slice.length > 0) {
-            this.index++;
-            await this.state.storage.put(`arbitrages${this.index}`, slice);
-          } else {
-            break;
+        let dates = new Set<string>();
+        for (const arb of arbitrageSuccesses) {
+          const date = dayjs.utc(arb.timestamp / 1_000_000);
+          this.currentDate = date.format('YYYY-MM-DD');
+          if (this.arbitrages[this.currentDate] == null) {
+            this.arbitrages[this.currentDate] =
+              await this.lazyLoadArbDate(date);
           }
+          this.arbitrages[this.currentDate]!.push(arb);
+          dates.add(this.currentDate);
         }
+        await Promise.all(
+          Array.from(dates).map(date =>
+            this.storeArbs(this.arbitrages[date]!, dayjs.utc(date))
+          )
+        );
 
         const arbitrageFailures = events.filter(
           arb => arb.status === 'failure'
         );
-        this.arbitrageFailures =
-          this.arbitrageFailures.concat(arbitrageFailures);
-        slice = this.arbitrageFailures.slice(
-          this.indexFailures * this.pageSize,
-          (this.indexFailures + 1) * this.pageSize
-        );
-        await this.state.storage.put(
-          `arbitrageFailures${this.indexFailures}`,
-          slice
-        );
-        // eslint-disable-next-line no-constant-condition
-        while (true) {
-          slice = this.arbitrageFailures.slice(
-            (this.indexFailures + 1) * this.pageSize,
-            (this.indexFailures + 2) * this.pageSize
-          );
-          if (slice.length > 0) {
-            this.indexFailures++;
-            await this.state.storage.put(
-              `arbitrageFailures${this.indexFailures}`,
-              slice
-            );
-          } else {
-            break;
+        dates = new Set<string>();
+        for (const arb of arbitrageFailures) {
+          const date = dayjs.utc(arb.timestamp / 1_000_000);
+          this.currentDate = date.format('YYYY-MM-DD');
+          if (this.arbitrageFailures[this.currentDate] == null) {
+            this.arbitrageFailures[this.currentDate] =
+              await this.lazyLoadArbFailureDate(date);
           }
+          this.arbitrageFailures[this.currentDate]!.push(arb);
+          dates.add(this.currentDate);
         }
+        await Promise.all(
+          Array.from(dates).map(date =>
+            this.storeArbFailures(
+              this.arbitrageFailures[date]!,
+              dayjs.utc(date)
+            )
+          )
+        );
+
+        await this.state.storage.put('currentDate', this.currentDate);
 
         return new Response(null, { status: 204 });
       })
       .delete('*', async () => {
-        this.arbitrages = [];
-        this.index = 0;
-        this.arbitrageFailures = [];
-        this.indexFailures = 0;
+        this.currentDate = undefined;
+        this.arbitrages = {};
+        this.arbitrageFailures = {};
+        this.dailyProfitsCache = {};
+        this.dailyGasCache = {};
         await this.state.storage.deleteAll();
         return new Response(null, { status: 204 });
       });
@@ -586,5 +388,149 @@ export class Bots {
 
   async fetch(request: Request): Promise<Response> {
     return this.app.fetch(request);
+  }
+
+  private async lazyLoadArbDate(date: dayjs.Dayjs): Promise<Arbitrage[]> {
+    const formattedDate = date.format('YYYY-MM-DD');
+    if (this.arbitrages[formattedDate] == null) {
+      this.arbitrages[formattedDate] = (
+        await Promise.all(
+          [...Array(24).keys()].map(
+            h =>
+              new Promise<Arbitrage[]>((resolve, reject) =>
+                this.state.storage
+                  .get<Uint8Array>(
+                    `arbitrages_${date.format('YYYY-MM-DD')}-${h.toString().padStart(2, '00')}`
+                  )
+                  .then(async hourlyArbs => {
+                    if (hourlyArbs != null) {
+                      const blob = new Blob([hourlyArbs]);
+                      const res = blob
+                        .stream()
+                        .pipeThrough(new DecompressionStream('gzip'));
+                      return new Response(res).json<Arbitrage[]>();
+                    }
+                    return [];
+                  })
+                  .then(arbs => resolve(arbs))
+                  .catch(err => reject(err))
+              )
+          )
+        )
+      ).flat();
+    }
+    return this.arbitrages[formattedDate]!;
+  }
+
+  private async storeArbs(arbs: Arbitrage[], date: dayjs.Dayjs): Promise<void> {
+    const encoder = new TextEncoder();
+    const startDate = date.startOf('day');
+
+    await Promise.all(
+      [...Array(24).keys()].map(
+        h =>
+          new Promise<void>((resolve, reject) => {
+            const hourlyDate = startDate
+              .add(h, 'hours')
+              .format('YYYY-MM-DD-HH');
+            const hourlyArbs = arbs.filter(
+              arb =>
+                dayjs.utc(arb.timestamp / 1_000_000).format('YYYY-MM-DD-HH') ===
+                hourlyDate
+            );
+            if (hourlyArbs.length === 0) {
+              resolve();
+              return;
+            }
+            const blob = new Blob([encoder.encode(JSON.stringify(hourlyArbs))]);
+            return new Response(
+              blob.stream().pipeThrough(new CompressionStream('gzip'))
+            )
+              .arrayBuffer()
+              .then((buffer: ArrayBuffer) => {
+                const data = new Uint8Array(buffer);
+                return this.state.storage.put(`arbitrages_${hourlyDate}`, data);
+              })
+              .then(resolve)
+              .catch(reject);
+          })
+      )
+    );
+  }
+
+  private async lazyLoadArbFailureDate(
+    date: dayjs.Dayjs
+  ): Promise<Arbitrage[]> {
+    const formattedDate = date.format('YYYY-MM-DD');
+    if (this.arbitrageFailures[formattedDate] == null) {
+      this.arbitrageFailures[formattedDate] = (
+        await Promise.all(
+          [...Array(24).keys()].map(
+            h =>
+              new Promise<Arbitrage[]>((resolve, reject) =>
+                this.state.storage
+                  .get<Uint8Array>(
+                    `arbitrageFailures_${date.format('YYYY-MM-DD')}-${h.toString().padStart(2, '00')}`
+                  )
+                  .then(async hourlyArbs => {
+                    if (hourlyArbs != null) {
+                      const blob = new Blob([hourlyArbs]);
+                      const res = blob
+                        .stream()
+                        .pipeThrough(new DecompressionStream('gzip'));
+                      return new Response(res).json<Arbitrage[]>();
+                    }
+                    return [];
+                  })
+                  .then(arbs => resolve(arbs))
+                  .catch(err => reject(err))
+              )
+          )
+        )
+      ).flat();
+    }
+    return this.arbitrageFailures[formattedDate]!;
+  }
+
+  private async storeArbFailures(
+    arbs: Arbitrage[],
+    date: dayjs.Dayjs
+  ): Promise<void> {
+    const encoder = new TextEncoder();
+    const startDate = date.startOf('day');
+
+    await Promise.all(
+      [...Array(24).keys()].map(
+        h =>
+          new Promise<void>((resolve, reject) => {
+            const hourlyDate = startDate
+              .add(h, 'hours')
+              .format('YYYY-MM-DD-HH');
+            const hourlyArbs = arbs.filter(
+              arb =>
+                dayjs.utc(arb.timestamp / 1_000_000).format('YYYY-MM-DD-HH') ===
+                hourlyDate
+            );
+            if (hourlyArbs.length === 0) {
+              resolve();
+              return;
+            }
+            const blob = new Blob([encoder.encode(JSON.stringify(hourlyArbs))]);
+            return new Response(
+              blob.stream().pipeThrough(new CompressionStream('gzip'))
+            )
+              .arrayBuffer()
+              .then((buffer: ArrayBuffer) => {
+                const data = new Uint8Array(buffer);
+                return this.state.storage.put(
+                  `arbitrageFailures_${hourlyDate}`,
+                  data
+                );
+              })
+              .then(resolve)
+              .catch(reject);
+          })
+      )
+    );
   }
 }
