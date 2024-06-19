@@ -6,7 +6,5 @@
   "editor.formatOnSave": true,
   "editor.tabSize": 2,
   "eslint.validate": ["javascript", "typescript", "svelte"],
-  "rust-analyzer.showUnlinkedFileNotification": false,
-  "svelte.enable-ts-plugin": true,
-  "svelte.plugin.svelte.defaultScriptLanguage": "ts"
+  "rust-analyzer.showUnlinkedFileNotification": false
 }

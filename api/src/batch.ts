@@ -76,7 +76,9 @@ batch
         try {
           await new Promise<void>((resolve, reject) => {
             console.info(
-              `[${new Date().toLocaleString()}] Indexing ${events.length} events for ${senderId}`
+              `[${new Date().toLocaleString()}] Indexing ${
+                events.length
+              } events for ${senderId}`
             );
 
             const botsAddr = c.env.BOTS.idFromName(senderId);

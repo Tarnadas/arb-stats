@@ -49,5 +49,5 @@ app.notFound(() => {
 
 export default app;
 
-export { Bots, BotIds } from './bots';
+export { Bots, BotIds, DailyGasStats, DailyProfitStats } from './bots';
 export { Info } from './info';

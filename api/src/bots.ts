@@ -13,7 +13,7 @@ const zDailyProfitStats = z.object({
   profitsNear: z.string()
 });
 
-type DailyProfitStats = z.infer<typeof zDailyProfitStats>;
+export type DailyProfitStats = z.infer<typeof zDailyProfitStats>;
 
 const zDailyGasStats = z.object({
   date: z.string(),
@@ -23,7 +23,7 @@ const zDailyGasStats = z.object({
   nearBurnt: z.string()
 });
 
-type DailyGasStats = z.infer<typeof zDailyGasStats>;
+export type DailyGasStats = z.infer<typeof zDailyGasStats>;
 
 const botIds = z.enum([
   'bot.marior.near',
@@ -117,7 +117,9 @@ bots
       }
 
       const res = await obj.fetch(
-        `${new URL(c.req.url).origin}/daily/profit?startDate=${startDateStr ?? ''}&endDate=${endDateStr ?? ''}`
+        `${new URL(c.req.url).origin}/daily/profit?startDate=${
+          startDateStr ?? ''
+        }&endDate=${endDateStr ?? ''}`
       );
       if (res.status === 404) {
         return c.text('No data available', 404);
@@ -198,7 +200,9 @@ bots
       }
 
       const res = await obj.fetch(
-        `${new URL(c.req.url).origin}/daily/gas?startDate=${startDateStr ?? ''}&endDate=${endDateStr ?? ''}`
+        `${new URL(c.req.url).origin}/daily/gas?startDate=${
+          startDateStr ?? ''
+        }&endDate=${endDateStr ?? ''}`
       );
       if (res.status === 404) {
         return c.text('No data available', 404);
@@ -243,7 +247,9 @@ bots
       const obj = c.env.BOTS.get(addr);
       const { date: dateStr, status } = c.req.query();
       const res = await obj.fetch(
-        `${new URL(c.req.url).origin}?date=${dateStr}&status=${status || 'success'}`
+        `${new URL(c.req.url).origin}?date=${dateStr}&status=${
+          status || 'success'
+        }`
       );
       const arbitrages = await res.json<Arbitrage[]>();
       return c.json(arbitrages);
@@ -488,7 +494,9 @@ export class Bots {
               new Promise<Arbitrage[]>((resolve, reject) =>
                 this.state.storage
                   .get<Uint8Array>(
-                    `arbitrages_${date.format('YYYY-MM-DD')}-${h.toString().padStart(2, '00')}`
+                    `arbitrages_${date.format('YYYY-MM-DD')}-${h
+                      .toString()
+                      .padStart(2, '00')}`
                   )
                   .then(async hourlyArbs => {
                     if (hourlyArbs != null) {
@@ -558,7 +566,9 @@ export class Bots {
               new Promise<Arbitrage[]>((resolve, reject) =>
                 this.state.storage
                   .get<Uint8Array>(
-                    `arbitrageFailures_${date.format('YYYY-MM-DD')}-${h.toString().padStart(2, '00')}`
+                    `arbitrageFailures_${date.format('YYYY-MM-DD')}-${h
+                      .toString()
+                      .padStart(2, '00')}`
                   )
                   .then(async hourlyArbs => {
                     if (hourlyArbs != null) {
