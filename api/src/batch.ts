@@ -47,10 +47,16 @@ batch
       const botIdsAddr = c.env.BOT_IDS.idFromName('');
       const botIdsStub = c.env.BOT_IDS.get(botIdsAddr);
 
-      await infoStub.fetch(`${new URL(c.req.url).origin}/last_block_height`, {
-        method: 'POST',
-        body: String(blockHeight)
-      });
+      const res = await infoStub.fetch(
+        `${new URL(c.req.url).origin}/last_block_height`,
+        {
+          method: 'POST',
+          body: String(blockHeight)
+        }
+      );
+      if (!res.ok) {
+        return new Response(null, { status: 400 });
+      }
 
       const allSenders = new Set<string>();
       for (const batchEvent of batchEvents) {

@@ -54,6 +54,9 @@ export class Info {
       .post('/last_block_height', async c => {
         if (!this.info) return c.text('', 500);
         const lastBlockHeight = Number(await c.req.text());
+        if (lastBlockHeight <= this.info.lastBlockHeight) {
+          return new Response(null, { status: 400 });
+        }
         this.info.lastBlockHeight = lastBlockHeight;
         await this.state.storage.put('info', this.info);
         return new Response(null, { status: 204 });
