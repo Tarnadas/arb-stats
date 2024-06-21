@@ -57,11 +57,7 @@ pub async fn send_data(
             {
                 Ok(_) => {}
                 Err(err) => {
-                    panic!(
-                        "{}\n\nSent data:\n{:#?}",
-                        err,
-                        serde_json::to_value(batch_event)
-                    );
+                    panic!("{}", err);
                 }
             }
             batch_event.clear();

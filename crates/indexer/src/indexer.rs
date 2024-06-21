@@ -35,66 +35,116 @@ pub async fn poll_block<'a>(
     impl Stream<Item = (BlockHeight, u64, Vec<ArbEvent>)> + 'a,
     BlockHeight,
 )> {
-    let block_height = get_current_block_height().await?;
+    let mut current_block_height = get_current_block_height().await?;
     let max_concurrency = env::var("MAX_CONCURRENCY").unwrap().parse::<usize>()?;
 
     Ok((
         stream! {
-            for chunk in (block_height..).chunks(max_concurrency).into_iter() {
-                let block_results: Vec<_> = join_all(chunk.map(|block_height| async move {
-                    let block = match rpc_client
-                        .call(methods::block::RpcBlockRequest {
-                            block_reference: BlockReference::BlockId(BlockId::Height(block_height)),
-                        })
-                        .await
-                        .map_err(|_| {
-                            fallback_rpc_client.call(methods::block::RpcBlockRequest {
-                                block_reference: BlockReference::BlockId(BlockId::Height(block_height)),
-                            })
-                        }) {
-                        Ok(block) => Some((block, false)),
-                        Err(res) => match res.await {
-                            Ok(block) => Some((block, true)),
-                            Err(_) => {
-                                None
-                            }
-                        },
-                    };
-                    match block {
-                        Some((block, use_fallback)) => {
-                            let timestamp = block.header.timestamp_nanosec;
+            'outer: loop {
+                let rpc_status = rpc_client.call(methods::status::RpcStatusRequest).await.unwrap();
+                let earliest_block_height = rpc_status.sync_info.earliest_block_height.unwrap() + 100;
 
-                            Some((
-                                block_height,
-                                timestamp,
-                                handle_block(
-                                    block,
-                                    if use_fallback {
-                                        fallback_rpc_client
+                if current_block_height >= earliest_block_height {
+                    loop {
+                        let block = match rpc_client
+                            .call(methods::block::RpcBlockRequest {
+                                block_reference: BlockReference::BlockId(BlockId::Height(current_block_height)),
+                            })
+                            .await
+                            .map_err(|_| {
+                                fallback_rpc_client.call(methods::block::RpcBlockRequest {
+                                    block_reference: BlockReference::BlockId(BlockId::Height(current_block_height)),
+                                })
+                            }) {
+                            Ok(block) => (Some(block), false),
+                            Err(res) => match res.await {
+                                Ok(block) => (Some(block), true),
+                                Err(_) => (None, true),
+                            },
+                        };
+                        match block {
+                            (Some(block), use_fallback) => {
+                                let timestamp = block.header.timestamp_nanosec;
+
+                                yield (
+                                    current_block_height,
+                                    timestamp,
+                                    handle_block(
+                                        block,
+                                        if use_fallback {
+                                            fallback_rpc_client
+                                        } else {
+                                            rpc_client
+                                        },
+                                    )
+                                    .await
+                                    .unwrap(),
+                                );
+                                current_block_height += 1;
+                            }
+                            (None, use_fallback) => {
+                                if use_fallback {
+                                    let rpc_status = rpc_client
+                                        .call(methods::status::RpcStatusRequest)
+                                        .await
+                                        .unwrap();
+                                    if current_block_height + 5 < rpc_status.sync_info.latest_block_height {
+                                        current_block_height += 1;
                                     } else {
-                                        rpc_client
-                                    },
-                                )
-                                .await
-                                .unwrap(),
-                            ))
-                        }
-                        None => {
-                            None
+                                        tokio::time::sleep(Duration::from_millis(1_000)).await;
+                                    }
+                                } else {
+                                    tokio::time::sleep(Duration::from_millis(1_000)).await;
+                                }
+                            }
                         }
                     }
-                }))
-                .await
-                .into_iter()
-                .flatten()
-                .collect();
+                } else {
+                    for (index, chunk) in (current_block_height..)
+                        .chunks(max_concurrency)
+                        .into_iter()
+                        .enumerate()
+                    {
+                        let block_results: Vec<_> = join_all(chunk.map(|block_height| async move {
+                            let block = match fallback_rpc_client
+                                .call(methods::block::RpcBlockRequest {
+                                    block_reference: BlockReference::BlockId(BlockId::Height(block_height)),
+                                })
+                                .await
+                            {
+                                Ok(block) => Some(block),
+                                Err(_) => None,
+                            };
+                            match block {
+                                Some(block) => {
+                                    let timestamp = block.header.timestamp_nanosec;
 
-                for block_result in block_results {
-                    yield block_result;
+                                    Some((
+                                        block_height,
+                                        timestamp,
+                                        handle_block(block, fallback_rpc_client).await.unwrap(),
+                                    ))
+                                }
+                                None => None,
+                            }
+                        }))
+                        .await
+                        .into_iter()
+                        .flatten()
+                        .collect();
+
+                        for block_result in block_results {
+                            current_block_height = block_result.0;
+                            yield block_result;
+                        }
+                        if index > 100 {
+                            continue 'outer;
+                        }
+                    }
                 }
             }
         },
-        block_height,
+        current_block_height,
     ))
 }
 
