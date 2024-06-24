@@ -17,6 +17,7 @@
     "@remix-run/cloudflare": "^2.9.2",
     "@remix-run/react": "^2.9.2",
     "@remix-run/server-runtime": "^2.9.2",
+    "chroma-js": "^2.4.2",
     "dayjs": "^1.11.11",
     "isbot": "^4.1.0",
     "lightweight-charts": "^4.1.5",
@@ -28,6 +29,7 @@
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20240614.0",
     "@remix-run/dev": "^2.9.2",
+    "@types/chroma-js": "^2.4.4",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "autoprefixer": "^10.4.19",
