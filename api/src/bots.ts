@@ -62,6 +62,9 @@ bots
           }),
           endDate: z.string().date().optional().openapi({
             description: 'format: `YYYY-MM-DD`'
+          }),
+          dates: z.string().optional().openapi({
+            description: 'fetch specific dates joined via `,`'
           })
         })
       },
@@ -94,34 +97,58 @@ bots
       const botId = c.req.param('bot_id');
       const addr = c.env.BOTS.idFromName(botId);
       const obj = c.env.BOTS.get(addr);
-      const { startDate: startDateStr, endDate: endDateStr } = c.req.query();
-      let startDate: dayjs.Dayjs | undefined;
-      if (startDateStr) {
-        startDate = dayjs.utc(startDateStr);
+
+      const {
+        startDate: startDateStr,
+        endDate: endDateStr,
+        dates
+      } = c.req.query();
+
+      if ((startDateStr || endDateStr) && dates) {
+        return c.text(
+          'can either use `dates` or `startDate` / `endDate`, but not both',
+          400
+        );
       }
-      let endDate: dayjs.Dayjs | undefined;
-      if (endDateStr) {
-        endDate = dayjs.utc(endDateStr);
-      } else if (startDate != null) {
-        endDate = startDate.add(7, 'days');
-      }
-      if (startDate == null && endDate != null) {
-        startDate = endDate.subtract(7, 'days');
-      }
-      if (startDate != null && endDate != null) {
-        if (startDate.isAfter(endDate)) {
-          return c.text('`startDate` is after `endDate`', 400);
+
+      const url = new URL(`${new URL(c.req.url).origin}/daily/profit`);
+      if (dates) {
+        url.searchParams.set('dates', dates);
+      } else {
+        let startDate: dayjs.Dayjs | undefined;
+        if (startDateStr) {
+          startDate = dayjs.utc(startDateStr);
         }
-        if (endDate.diff(startDate, 'day') >= 7) {
-          return c.text('can only fetch at most 7 days', 400);
+        let endDate: dayjs.Dayjs | undefined;
+        if (endDateStr) {
+          endDate = dayjs.utc(endDateStr);
+        } else if (startDate != null) {
+          endDate = startDate.add(6, 'days');
+        }
+        if (startDate == null && endDate != null) {
+          startDate = endDate.subtract(6, 'days');
+        }
+        if (startDate != null && endDate != null) {
+          if (startDate.isAfter(endDate)) {
+            return c.text('`startDate` is after `endDate`', 400);
+          }
+          if (endDate.diff(startDate, 'day') >= 7) {
+            return c.text('can only fetch at most 7 days', 400);
+          }
+        }
+        if (startDate != null) {
+          url.searchParams.set('startDate', startDate.format('YYYY-MM-DD'));
+        }
+        if (endDate != null) {
+          const now = dayjs.utc();
+          if (endDate.isAfter(now)) {
+            endDate = now;
+          }
+          url.searchParams.set('endDate', endDate.format('YYYY-MM-DD'));
         }
       }
 
-      const res = await obj.fetch(
-        `${new URL(c.req.url).origin}/daily/profit?startDate=${
-          startDateStr ?? ''
-        }&endDate=${endDateStr ?? ''}`
-      );
+      const res = await obj.fetch(url.toString());
       if (res.status === 404) {
         return c.text('No data available', 404);
       } else if (res.status === 500) {
@@ -146,6 +173,9 @@ bots
         }),
         endDate: z.string().date().optional().openapi({
           description: 'format: `YYYY-MM-DD`'
+        }),
+        dates: z.string().optional().openapi({
+          description: 'fetch specific dates joined via `,`'
         })
       },
       responses: {
@@ -177,34 +207,58 @@ bots
       const botId = c.req.param('bot_id');
       const addr = c.env.BOTS.idFromName(botId);
       const obj = c.env.BOTS.get(addr);
-      const { startDate: startDateStr, endDate: endDateStr } = c.req.query();
-      let startDate: dayjs.Dayjs | undefined;
-      if (startDateStr) {
-        startDate = dayjs.utc(startDateStr);
+
+      const {
+        startDate: startDateStr,
+        endDate: endDateStr,
+        dates
+      } = c.req.query();
+
+      if ((startDateStr || endDateStr) && dates) {
+        return c.text(
+          'can either use `dates` or `startDate` / `endDate`, but not both',
+          400
+        );
       }
-      let endDate: dayjs.Dayjs | undefined;
-      if (endDateStr) {
-        endDate = dayjs.utc(endDateStr);
-      } else if (startDate != null) {
-        endDate = startDate.add(7, 'days');
-      }
-      if (startDate == null && endDate != null) {
-        startDate = endDate.subtract(7, 'days');
-      }
-      if (startDate != null && endDate != null) {
-        if (startDate.isAfter(endDate)) {
-          return c.text('`startDate` is after `endDate`', 400);
+
+      const url = new URL(`${new URL(c.req.url).origin}/daily/profit`);
+      if (dates) {
+        url.searchParams.set('dates', dates);
+      } else {
+        let startDate: dayjs.Dayjs | undefined;
+        if (startDateStr) {
+          startDate = dayjs.utc(startDateStr);
         }
-        if (endDate.diff(startDate, 'day') >= 7) {
-          return c.text('can only fetch at most 7 days', 400);
+        let endDate: dayjs.Dayjs | undefined;
+        if (endDateStr) {
+          endDate = dayjs.utc(endDateStr);
+        } else if (startDate != null) {
+          endDate = startDate.add(6, 'days');
+        }
+        if (startDate == null && endDate != null) {
+          startDate = endDate.subtract(6, 'days');
+        }
+        if (startDate != null && endDate != null) {
+          if (startDate.isAfter(endDate)) {
+            return c.text('`startDate` is after `endDate`', 400);
+          }
+          if (endDate.diff(startDate, 'day') >= 7) {
+            return c.text('can only fetch at most 7 days', 400);
+          }
+        }
+        if (startDate != null) {
+          url.searchParams.set('startDate', startDate.format('YYYY-MM-DD'));
+        }
+        if (endDate != null) {
+          const now = dayjs.utc();
+          if (endDate.isAfter(now)) {
+            endDate = now;
+          }
+          url.searchParams.set('endDate', endDate.format('YYYY-MM-DD'));
         }
       }
 
-      const res = await obj.fetch(
-        `${new URL(c.req.url).origin}/daily/gas?startDate=${
-          startDateStr ?? ''
-        }&endDate=${endDateStr ?? ''}`
-      );
+      const res = await obj.fetch(url.toString());
       if (res.status === 404) {
         return c.text('No data available', 404);
       } else if (res.status === 500) {
@@ -315,7 +369,21 @@ export class Bots {
           return new Response(null, { status: 404 });
         }
 
-        const { startDate: startDateStr, endDate: endDateStr } = c.req.query();
+        const {
+          startDate: startDateStr,
+          endDate: endDateStr,
+          dates: datesStr
+        } = c.req.query();
+
+        if (datesStr) {
+          const dates = datesStr.split(',').map(date => dayjs.utc(date));
+          const stats: DailyProfitStats[] = [];
+          for (const date of dates) {
+            await this.getDateProfits(date, stats);
+          }
+          return c.json(stats);
+        }
+
         let endDate: dayjs.Dayjs;
         if (endDateStr) {
           endDate = dayjs.utc(endDateStr).add(1, 'day');
@@ -331,27 +399,7 @@ export class Bots {
 
         const stats: DailyProfitStats[] = [];
         for (; date.isBefore(endDate); date = date.add(1, 'day')) {
-          const formattedDate = date.format('YYYY-MM-DD');
-          let profits = 0n;
-          const arbs = await this.lazyLoadArbDate(date);
-          for (const arb of arbs) {
-            if (arb.status === 'success') {
-              profits += BigInt(arb.profit);
-            }
-          }
-          const arbStats = {
-            date: formattedDate,
-            from: date.valueOf(),
-            to: date.endOf('day').valueOf(),
-            profits: profits.toString(),
-            profitsNear: new FixedNumber(profits, 24).format({
-              maximumFractionDigits: 3
-            })
-          };
-          if (this.currentDate !== formattedDate) {
-            this.dailyProfitsCache[formattedDate] = arbStats;
-          }
-          stats.push(arbStats);
+          await this.getDateProfits(date, stats);
         }
 
         return c.json(stats);
@@ -361,7 +409,21 @@ export class Bots {
           return new Response(null, { status: 404 });
         }
 
-        const { startDate: startDateStr, endDate: endDateStr } = c.req.query();
+        const {
+          startDate: startDateStr,
+          endDate: endDateStr,
+          dates: datesStr
+        } = c.req.query();
+
+        if (datesStr) {
+          const dates = datesStr.split(',').map(date => dayjs.utc(date));
+          const stats: DailyGasStats[] = [];
+          for (const date of dates) {
+            await this.getDateGas(date, stats);
+          }
+          return c.json(stats);
+        }
+
         let endDate: dayjs.Dayjs;
         if (endDateStr) {
           endDate = dayjs.utc(endDateStr).add(1, 'day');
@@ -377,29 +439,7 @@ export class Bots {
 
         const stats: DailyGasStats[] = [];
         for (; date.isBefore(endDate); date = date.add(1, 'day')) {
-          const formattedDate = date.format('YYYY-MM-DD');
-          let gasBurnt = 0n;
-          const arbs = await this.lazyLoadArbDate(date);
-          for (const arb of arbs) {
-            gasBurnt += BigInt(arb.gasBurnt);
-          }
-          const arbFailures = await this.lazyLoadArbFailureDate(date);
-          for (const arb of arbFailures) {
-            gasBurnt += BigInt(arb.gasBurnt);
-          }
-          const arbStats = {
-            date: formattedDate,
-            from: date.valueOf(),
-            to: date.endOf('day').valueOf(),
-            gasBurnt: gasBurnt.toString(),
-            nearBurnt: new FixedNumber(gasBurnt, 16).format({
-              maximumFractionDigits: 5
-            })
-          } satisfies DailyGasStats;
-          if (this.currentDate !== formattedDate) {
-            this.dailyGasCache[formattedDate] = arbStats;
-          }
-          stats.push(arbStats);
+          await this.getDateGas(date, stats);
         }
 
         return c.json(stats);
@@ -485,6 +525,30 @@ export class Bots {
     return this.app.fetch(request);
   }
 
+  private async getDateProfits(date: dayjs.Dayjs, stats: DailyProfitStats[]) {
+    const formattedDate = date.format('YYYY-MM-DD');
+    let profits = 0n;
+    const arbs = await this.lazyLoadArbDate(date);
+    for (const arb of arbs) {
+      if (arb.status === 'success') {
+        profits += BigInt(arb.profit);
+      }
+    }
+    const arbStats = {
+      date: formattedDate,
+      from: date.valueOf(),
+      to: date.endOf('day').valueOf(),
+      profits: profits.toString(),
+      profitsNear: new FixedNumber(profits, 24).format({
+        maximumFractionDigits: 3
+      })
+    };
+    if (this.currentDate !== formattedDate) {
+      this.dailyProfitsCache[formattedDate] = arbStats;
+    }
+    stats.push(arbStats);
+  }
+
   private async lazyLoadArbDate(date: dayjs.Dayjs): Promise<Arbitrage[]> {
     const formattedDate = date.format('YYYY-MM-DD');
     if (this.arbitrages[formattedDate] == null) {
@@ -553,6 +617,32 @@ export class Bots {
           })
       )
     );
+  }
+
+  private async getDateGas(date: dayjs.Dayjs, stats: DailyGasStats[]) {
+    const formattedDate = date.format('YYYY-MM-DD');
+    let gasBurnt = 0n;
+    const arbs = await this.lazyLoadArbDate(date);
+    for (const arb of arbs) {
+      gasBurnt += BigInt(arb.gasBurnt);
+    }
+    const arbFailures = await this.lazyLoadArbFailureDate(date);
+    for (const arb of arbFailures) {
+      gasBurnt += BigInt(arb.gasBurnt);
+    }
+    const arbStats = {
+      date: formattedDate,
+      from: date.valueOf(),
+      to: date.endOf('day').valueOf(),
+      gasBurnt: gasBurnt.toString(),
+      nearBurnt: new FixedNumber(gasBurnt, 16).format({
+        maximumFractionDigits: 5
+      })
+    } satisfies DailyGasStats;
+    if (this.currentDate !== formattedDate) {
+      this.dailyGasCache[formattedDate] = arbStats;
+    }
+    stats.push(arbStats);
   }
 
   private async lazyLoadArbFailureDate(
