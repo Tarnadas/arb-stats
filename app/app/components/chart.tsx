@@ -1,67 +1,16 @@
-import dayjs from 'dayjs';
-import {
-  createChart,
-  LineData,
-  Time,
-  WhitespaceData
-} from 'lightweight-charts';
-import { FC, useEffect, useRef, useState } from 'react';
+import { createChart } from 'lightweight-charts';
+import { FC, useEffect, useRef } from 'react';
 
-import { DailyProfitStats } from '../../../api/src';
+import { ChartData } from '~/types';
 
-import { client } from '~/api';
-
-type ChartData = LineData<Time> | WhitespaceData<Time>;
-
-export const Chart: FC = () => {
-  const [data, setData] = useState<ChartData[]>([]);
-
+export const Chart: FC<{
+  botData: {
+    chartData: ChartData[];
+    color: string;
+  }[];
+  loading: boolean;
+}> = ({ botData, loading }) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const run = async () => {
-      let startDate = dayjs('2024-03-16');
-      const now = dayjs();
-
-      const promises = [];
-      while (startDate.isBefore(now)) {
-        promises.push(
-          new Promise<DailyProfitStats[]>((resolve, reject) => {
-            client
-              .GET('/bots/{bot_id}/daily/profit', {
-                params: {
-                  path: {
-                    bot_id: 'bot.marior.near'
-                  },
-                  query: {
-                    startDate: startDate.format('YYYY-MM-DD'),
-                    endDate: startDate.add(6, 'days').format('YYYY-MM-DD')
-                  }
-                }
-              })
-              .then(res => {
-                if (res.error != null) {
-                  reject(res.error);
-                  return;
-                }
-                resolve(res.data);
-              });
-          })
-        );
-        startDate = startDate.add(7, 'days');
-      }
-
-      const profitsData = (await Promise.all(promises)).flat();
-
-      setData(
-        profitsData.map(
-          ({ date, profitsNear }) =>
-            ({ time: date, value: Number(profitsNear) }) satisfies ChartData
-        )
-      );
-    };
-    run();
-  }, []);
 
   useEffect(() => {
     if (chartContainerRef.current == null) {
@@ -85,12 +34,14 @@ export const Chart: FC = () => {
     });
     chart.timeScale().fitContent();
 
-    const newSeries = chart.addLineSeries({
-      // lineColor,
-      // topColor: areaTopColor,
-      // bottomColor: areaBottomColor
-    });
-    newSeries.setData(data);
+    for (const { chartData, color } of botData) {
+      const newSeries = chart.addLineSeries({
+        color
+        // topColor: areaTopColor,
+        // bottomColor: areaBottomColor
+      });
+      newSeries.setData(chartData ?? []);
+    }
 
     window.addEventListener('resize', handleResize);
 
@@ -100,7 +51,7 @@ export const Chart: FC = () => {
       chart.remove();
     };
   }, [
-    data
+    botData
     // backgroundColor,
     // lineColor,
     // textColor,
@@ -108,5 +59,9 @@ export const Chart: FC = () => {
     // areaBottomColor
   ]);
 
-  return <div ref={chartContainerRef} />;
+  if (loading) {
+    return <div className="loading loading-spinner loading-lg" />;
+  }
+
+  return <div className="w-full" ref={chartContainerRef} />;
 };
