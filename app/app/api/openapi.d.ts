@@ -11,8 +11,8 @@ type XOR<T, U> = T | U extends object
 type OneOf<T extends any[]> = T extends [infer Only]
   ? Only
   : T extends [infer A, infer B, ...infer Rest]
-  ? OneOf<[XOR<A, B>, ...Rest]>
-  : never;
+    ? OneOf<[XOR<A, B>, ...Rest]>
+    : never;
 
 export interface paths {
   '/info': {
@@ -52,9 +52,10 @@ export interface paths {
             | 'sneaky1.near'
             | 'kagool.near'
             | 'zalevsky.near'
+            | 'shitake.near'
+            | 'drooling.near'
             | 'foxboss.near'
-            | 'xy_k.near'
-            | 'shitake.near';
+            | 'xy_k.near';
         };
       };
       responses: {
@@ -105,9 +106,10 @@ export interface paths {
             | 'sneaky1.near'
             | 'kagool.near'
             | 'zalevsky.near'
+            | 'shitake.near'
+            | 'drooling.near'
             | 'foxboss.near'
-            | 'xy_k.near'
-            | 'shitake.near';
+            | 'xy_k.near';
         };
       };
       responses: {
@@ -162,9 +164,10 @@ export interface paths {
             | 'sneaky1.near'
             | 'kagool.near'
             | 'zalevsky.near'
+            | 'shitake.near'
+            | 'drooling.near'
             | 'foxboss.near'
-            | 'xy_k.near'
-            | 'shitake.near';
+            | 'xy_k.near';
         };
       };
       responses: {
