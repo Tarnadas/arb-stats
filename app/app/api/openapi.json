@@ -69,6 +69,15 @@
             "required": false,
             "name": "endDate",
             "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "fetch specific dates joined via `,`"
+            },
+            "required": false,
+            "name": "dates",
+            "in": "query"
           }
         ],
         "responses": {

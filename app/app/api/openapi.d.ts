@@ -37,6 +37,7 @@ export interface paths {
         query?: {
           startDate?: string;
           endDate?: string;
+          dates?: string;
         };
         path: {
           bot_id:

@@ -9,11 +9,13 @@ import { ChartData } from '~/types';
 export const useBots = ({
   botIds,
   startDate,
-  endDate
+  endDate,
+  offsets
 }: {
   botIds: string[];
   startDate: dayjs.Dayjs;
   endDate: dayjs.Dayjs;
+  offsets: [number, number];
 }): {
   profits: {
     [k: string]: DailyProfitStats[] | undefined;
@@ -33,6 +35,15 @@ export const useBots = ({
     {}
   );
   const [loading, setLoading] = useState(false);
+
+  const startOffset = Math.round(offsets[0]);
+  if (startOffset < 0) {
+    startDate = startDate.subtract(startOffset, 'days');
+  }
+  const endOffset = Math.round(offsets[1]);
+  if (endOffset > 0) {
+    endDate = endDate.add(endOffset, 'days');
+  }
 
   useEffect(() => {
     const now = dayjs();

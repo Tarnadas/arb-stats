@@ -221,7 +221,7 @@ bots
         );
       }
 
-      const url = new URL(`${new URL(c.req.url).origin}/daily/profit`);
+      const url = new URL(`${new URL(c.req.url).origin}/daily/gas`);
       if (dates) {
         url.searchParams.set('dates', dates);
       } else {
