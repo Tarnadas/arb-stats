@@ -68,7 +68,8 @@ export const DailyChart: FC<{
       .then(datafeed => {
         for (const { botId, chartData, color } of datafeed) {
           series.current[botId] = chart.addLineSeries({
-            color
+            color,
+            title: botId
           });
           series.current[botId].setData(chartData ?? []);
         }

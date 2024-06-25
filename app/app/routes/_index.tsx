@@ -7,6 +7,7 @@ import Select, { StylesConfig } from 'react-select';
 import { BotDatafeed } from '~/botDatafeed';
 import { DailyChart } from '~/components';
 import { CumulativeChart } from '~/components/cumulativeChart';
+import { MarketShareChart } from '~/components/marketShareChart';
 import { BotOption, allBots } from '~/config';
 
 export const meta: MetaFunction = () => {
@@ -81,6 +82,7 @@ export default function Index() {
   );
   const [endDate, setEndDate] = useState<dayjs.Dayjs>(dayjs.utc());
   const [combine, setCombine] = useState(false);
+  const [movingAverageSize, setMovingAverageSize] = useState(3);
 
   const botIds = useMemo(
     () => botIdValues.map(({ value }) => value),
@@ -169,6 +171,41 @@ export default function Index() {
           endDate={endDate}
           setEndDate={setEndDate}
           combine={combine}
+        />
+      </div>
+      <div className="flex flex-col gap-2 items-stretch w-full mb-2">
+        <h2 className="font-bold text-3xl self-center">
+          Moving Average Market Share
+        </h2>
+        <div className="join">
+          <button
+            className={`join-item btn ${movingAverageSize === 3 ? 'btn-active' : ''}`}
+            onClick={() => setMovingAverageSize(3)}
+          >
+            3d
+          </button>
+          <button
+            className={`join-item btn ${movingAverageSize === 7 ? 'btn-active' : ''}`}
+            onClick={() => setMovingAverageSize(7)}
+          >
+            1w
+          </button>
+          <button
+            className={`join-item btn ${movingAverageSize === 14 ? 'btn-active' : ''}`}
+            onClick={() => setMovingAverageSize(14)}
+          >
+            2w
+          </button>
+        </div>
+        <MarketShareChart
+          botIds={botIds}
+          botDatafeed={botDatafeed}
+          startDate={startDate}
+          setStartDate={setStartDate}
+          endDate={endDate}
+          setEndDate={setEndDate}
+          combine={combine}
+          movingAverageSize={movingAverageSize}
         />
       </div>
     </div>

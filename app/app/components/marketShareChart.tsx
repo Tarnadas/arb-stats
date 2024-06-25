@@ -1,6 +1,5 @@
-import chroma from 'chroma-js';
 import dayjs from 'dayjs';
-import { createChart } from 'lightweight-charts';
+import { LineType, createChart } from 'lightweight-charts';
 import {
   Dispatch,
   FC,
@@ -10,10 +9,10 @@ import {
   useState
 } from 'react';
 
-import { BotDatafeed, priceFormatter } from '~/botDatafeed';
+import { BotDatafeed } from '~/botDatafeed';
 import { ChartData } from '~/types';
 
-export const CumulativeChart: FC<{
+export const MarketShareChart: FC<{
   botIds: string[];
   botDatafeed: BotDatafeed;
   startDate: dayjs.Dayjs;
@@ -21,6 +20,7 @@ export const CumulativeChart: FC<{
   endDate: dayjs.Dayjs;
   setEndDate: Dispatch<SetStateAction<dayjs.Dayjs>>;
   combine: boolean;
+  movingAverageSize: number;
 }> = ({
   botIds,
   botDatafeed,
@@ -28,12 +28,13 @@ export const CumulativeChart: FC<{
   setStartDate,
   endDate,
   setEndDate,
-  combine
+  combine,
+  movingAverageSize
 }) => {
   const [loading, setLoading] = useState(false);
   const offsets = useRef<[number, number]>([0, 0]);
   const series = useRef<
-    Record<string, ReturnType<ReturnType<typeof createChart>['addAreaSeries']>>
+    Record<string, ReturnType<ReturnType<typeof createChart>['addLineSeries']>>
   >({});
   const chartContainerRef = useRef<HTMLDivElement>(null);
 
@@ -55,7 +56,11 @@ export const CumulativeChart: FC<{
     });
     chart.applyOptions({
       localization: {
-        priceFormatter
+        priceFormatter: (value: number) =>
+          `${Intl.NumberFormat('en-US', {
+            maximumFractionDigits: 2,
+            minimumIntegerDigits: 1
+          }).format(value * 100)}%`
       }
     });
 
@@ -68,23 +73,43 @@ export const CumulativeChart: FC<{
         combine
       })
       .then(datafeed => {
-        for (const { botId, chartData, color } of datafeed) {
-          series.current[botId] = chart.addAreaSeries({
-            lineColor: color,
-            topColor: chroma(color).alpha(0.4).hex(),
-            bottomColor: chroma(color).alpha(0).hex(),
-            title: botId
+        const sumChartData: number[] = [];
+        for (const { chartData } of datafeed) {
+          chartData.forEach((data, index) => {
+            sumChartData[index] = (sumChartData[index] ?? 0) + data.value;
           });
-          const convertedChartData: ChartData[] = [];
-          let cumulated = 0;
-          let index = 0;
-          for (const data of chartData) {
-            cumulated += data.value;
-            convertedChartData[index++] = {
-              value: cumulated,
-              time: data.time
-            };
+        }
+        const currentValues: number[] = [];
+        const sumMovingAverageChartData = sumChartData.map(data => {
+          currentValues.push(data);
+          if (currentValues.length > movingAverageSize) {
+            currentValues.splice(0, 1);
           }
+          return (
+            currentValues.reduce((acc, cur) => acc + cur, 0) /
+            currentValues.length
+          );
+        });
+        for (const { botId, chartData, color } of datafeed) {
+          series.current[botId] = chart.addLineSeries({
+            color,
+            title: botId,
+            lineType: LineType.Curved
+          });
+          const currentValues: ChartData[] = [];
+          const convertedChartData = chartData.map((data, index) => {
+            currentValues.push(data);
+            if (currentValues.length > movingAverageSize) {
+              currentValues.splice(0, 1);
+            }
+            return {
+              ...data,
+              value:
+                currentValues.reduce((acc, cur) => acc + cur.value, 0) /
+                currentValues.length /
+                sumMovingAverageChartData[index]
+            };
+          });
           series.current[botId].setData(convertedChartData ?? []);
         }
         chart.timeScale().fitContent();
@@ -126,19 +151,45 @@ export const CumulativeChart: FC<{
                   combine
                 })
                 .then(datafeed => {
-                  for (const { botId, chartData } of datafeed) {
-                    const convertedChartData: ChartData[] = [];
-                    let cumulated = 0;
-                    let index = 0;
-                    for (const data of chartData) {
-                      cumulated += data.value;
-                      convertedChartData[index++] = {
-                        value: cumulated,
-                        time: data.time
-                      };
+                  const sumChartData: number[] = [];
+                  for (const { chartData } of datafeed) {
+                    chartData.forEach((data, index) => {
+                      sumChartData[index] =
+                        (sumChartData[index] ?? 0) + data.value;
+                    });
+                  }
+                  const currentValues: number[] = [];
+                  const sumMovingAverageChartData = sumChartData.map(data => {
+                    currentValues.push(data);
+                    if (currentValues.length > movingAverageSize) {
+                      currentValues.splice(0, 1);
                     }
+                    return (
+                      currentValues.reduce((acc, cur) => acc + cur, 0) /
+                      currentValues.length
+                    );
+                  });
+                  for (const { botId, chartData } of datafeed) {
+                    const currentValues: ChartData[] = [];
+                    const convertedChartData = chartData.map((data, index) => {
+                      currentValues.push(data);
+                      if (currentValues.length > movingAverageSize) {
+                        currentValues.splice(0, 1);
+                      }
+                      return {
+                        ...data,
+                        value:
+                          currentValues.reduce(
+                            (acc, cur) => acc + cur.value,
+                            0
+                          ) /
+                          currentValues.length /
+                          sumMovingAverageChartData[index]
+                      };
+                    });
                     series.current[botId].setData(convertedChartData ?? []);
                   }
+
                   offsets.current = [0, 0];
                 });
             }
@@ -154,7 +205,7 @@ export const CumulativeChart: FC<{
       chart.remove();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [botIds, botDatafeed, combine]);
+  }, [botIds, botDatafeed, combine, movingAverageSize]);
 
   return (
     <>
