@@ -13,6 +13,8 @@ export type DatafeedResponse = {
   color: string;
 }[];
 
+const earliestDate = dayjs('2024-04-16');
+
 export class BotDatafeed {
   private profitsCache: Record<
     string,
@@ -34,6 +36,10 @@ export class BotDatafeed {
     startDate: dayjs.Dayjs;
     endDate: dayjs.Dayjs;
   }): Promise<DatafeedResponse> {
+    if (startDate.isBefore(earliestDate)) {
+      startDate = earliestDate.clone();
+    }
+
     const { profits: profitsData, gas: gasData } = await this.updateData({
       botIds,
       startDate,
