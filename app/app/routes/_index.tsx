@@ -77,9 +77,9 @@ export default function Index() {
   const [botIdValues, setBotIdValues] = useState([allBots[0], allBots[7]]);
   const [botDatafeed] = useState(new BotDatafeed());
   const [startDate, setStartDate] = useState<dayjs.Dayjs>(
-    dayjs().subtract(13, 'days')
+    dayjs.utc().subtract(13, 'days')
   );
-  const [endDate, setEndDate] = useState<dayjs.Dayjs>(dayjs());
+  const [endDate, setEndDate] = useState<dayjs.Dayjs>(dayjs.utc());
   const [combine, setCombine] = useState(false);
 
   const botIds = useMemo(
@@ -92,6 +92,12 @@ export default function Index() {
       <h1 className="font-bold text-4xl self-center mb-4">
         Near Arbitrage Statistics
       </h1>
+
+      <span className="text-xl text-white">
+        This dashboard provides statistics about all cyclic arbitrage bots on
+        Ref Finance.
+      </span>
+
       <Select
         className="w-full z-20"
         options={allBots}
@@ -100,8 +106,8 @@ export default function Index() {
         value={botIdValues}
         onChange={values => {
           setBotIdValues(Array.from(values));
-          setStartDate(dayjs().subtract(13, 'days'));
-          setEndDate(dayjs());
+          setStartDate(dayjs.utc().subtract(13, 'days'));
+          setEndDate(dayjs.utc());
         }}
         closeMenuOnSelect={false}
       />

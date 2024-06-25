@@ -13,7 +13,7 @@ export type DatafeedResponse = {
   color: string;
 }[];
 
-const earliestDate = dayjs('2024-03-16');
+const earliestDate = dayjs.utc('2024-03-16');
 
 export const priceFormatter = (value: number) =>
   `${Intl.NumberFormat('en-US', {
@@ -96,7 +96,7 @@ export class BotDatafeed {
     profits: Record<string, DailyProfitStats[] | undefined>;
     gas: Record<string, DailyGasStats[] | undefined>;
   }> {
-    const now = dayjs();
+    const now = dayjs.utc();
 
     const profitsPromise = Promise.all(
       botIds.map(botId => {
