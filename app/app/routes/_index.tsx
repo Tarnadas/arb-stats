@@ -93,10 +93,33 @@ export default function Index() {
         Near Arbitrage Statistics
       </h1>
 
-      <span className="text-xl text-white">
-        This dashboard provides statistics about all cyclic arbitrage bots on
-        Ref Finance.
-      </span>
+      <div className="collapse bg-base-200 text-white">
+        <input type="checkbox" />
+        <div className="collapse-title text-xl font-medium">
+          This dashboard provides statistics about all cyclic arbitrage bots on
+          Ref Finance. Click for more info
+        </div>
+        <div className="collapse-content flex flex-col gap-3 text-md">
+          <p>
+            Cyclic arbitrage works by finding a route through a single DEX with
+            the same input and output token. On Near Protocol this is generally
+            done by finding a route with wNEAR as input and output token. There
+            is an arbitrage opportunity, if the amount of output tokens is
+            higher than the amount of input tokens + gas fees. Arbitrage bots
+            are scanning all pools on Ref Finance to find such a potential
+            route.
+          </p>
+          <p>
+            Arbitrage bots are developed by individuals and it&apos;s basically
+            impossible to share revenue. If you see someone trying to let you
+            invest into arbitrage trading, then it&apos;s 100% a scam.
+          </p>
+          <p>
+            This dashboard is hosted on a Shitzu subdomain, but there is no
+            affiliation or revenue share planned.
+          </p>
+        </div>
+      </div>
 
       <Select
         className="w-full z-20"
