@@ -98,6 +98,8 @@ export default function Index() {
         value={botIdValues}
         onChange={values => {
           setBotIdValues(Array.from(values));
+          setStartDate(dayjs().subtract(13, 'days'));
+          setEndDate(dayjs());
         }}
         closeMenuOnSelect={false}
       />
