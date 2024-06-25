@@ -63,12 +63,14 @@ export class BotDatafeed {
     const chartData = Object.fromEntries(
       filteredBotIds.map(botId => [
         botId,
-        gas[botId]?.map(({ date, nearBurnt }, index) => ({
-          time: date,
-          value:
-            Number(profits[botId]?.[index]?.profitsNear ?? 0) -
-            Number(nearBurnt)
-        })) ?? []
+        gas[botId]
+          ?.filter(g => g != null)
+          .map(({ date, nearBurnt }, index) => ({
+            time: date,
+            value:
+              Number(profits[botId]?.[index]?.profitsNear ?? 0) -
+              Number(nearBurnt)
+          })) ?? []
       ])
     );
 
@@ -255,7 +257,7 @@ export class BotDatafeed {
                 (acc, botId) =>
                   acc +
                   (Number(
-                    this.profitsCache[botId]?.[currentDate].profitsNear
+                    this.profitsCache[botId]?.[currentDate]?.profitsNear
                   ) ?? 0),
                 0
               );
@@ -297,7 +299,7 @@ export class BotDatafeed {
               const combinedNearBurnt = bots.reduce(
                 (acc, botId) =>
                   acc +
-                  (Number(this.gasCache[botId]?.[currentDate].nearBurnt) ?? 0),
+                  (Number(this.gasCache[botId]?.[currentDate]?.nearBurnt) ?? 0),
                 0
               );
               const value = { ...this.gasCache[bots[0]]![currentDate] };
