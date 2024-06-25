@@ -3,6 +3,37 @@ import chroma from 'chroma-js';
 export const marioColor = '#b90000';
 export const aldorColor = '#0044b9';
 
+export const allBotOwners = [
+  {
+    value: 'marior.near',
+    label: 'marior.near',
+    color: chroma(marioColor).hex(),
+    bots: [
+      'bot.marior.near',
+      'bot0.marior.near',
+      'bot2.marior.near',
+      'bot3.marior.near',
+      'bot4.marior.near',
+      'bot5.marior.near',
+      'bot6.marior.near'
+    ]
+  },
+  {
+    value: 'dsaving.near',
+    label: 'dsaving.near',
+    color: chroma(aldorColor).hex(),
+    bots: [
+      'aldor.near',
+      'frisky.near',
+      'sneaky1.near',
+      'kagool.near',
+      'zalevsky.near',
+      'shitake.near',
+      'drooling.near'
+    ]
+  }
+];
+
 export const allBots = [
   {
     value: 'bot.marior.near',

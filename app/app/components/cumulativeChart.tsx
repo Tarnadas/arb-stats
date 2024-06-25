@@ -20,13 +20,15 @@ export const CumulativeChart: FC<{
   setStartDate: Dispatch<SetStateAction<dayjs.Dayjs>>;
   endDate: dayjs.Dayjs;
   setEndDate: Dispatch<SetStateAction<dayjs.Dayjs>>;
+  combine: boolean;
 }> = ({
   botIds,
   botDatafeed,
   startDate,
   setStartDate,
   endDate,
-  setEndDate
+  setEndDate,
+  combine
 }) => {
   const [loading, setLoading] = useState(false);
   const offsets = useRef<[number, number]>([0, 0]);
@@ -62,7 +64,8 @@ export const CumulativeChart: FC<{
       .getData({
         botIds,
         startDate,
-        endDate
+        endDate,
+        combine
       })
       .then(datafeed => {
         for (const { botId, chartData, color } of datafeed) {
@@ -118,7 +121,8 @@ export const CumulativeChart: FC<{
                 .getData({
                   botIds,
                   startDate: currentStartDate,
-                  endDate: currentEndDate
+                  endDate: currentEndDate,
+                  combine
                 })
                 .then(datafeed => {
                   for (const { botId, chartData } of datafeed) {
@@ -149,7 +153,7 @@ export const CumulativeChart: FC<{
       chart.remove();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [botIds, botDatafeed]);
+  }, [botIds, botDatafeed, combine]);
 
   return (
     <>

@@ -80,6 +80,7 @@ export default function Index() {
     dayjs().subtract(13, 'days')
   );
   const [endDate, setEndDate] = useState<dayjs.Dayjs>(dayjs());
+  const [combine, setCombine] = useState(false);
 
   const botIds = useMemo(
     () => botIdValues.map(({ value }) => value),
@@ -104,6 +105,19 @@ export default function Index() {
         }}
         closeMenuOnSelect={false}
       />
+      <label className="swap text-xl">
+        <input
+          type="checkbox"
+          checked={combine}
+          onChange={value => {
+            setCombine(value.target.checked);
+          }}
+        />
+
+        <div className="swap-on">👨 Combine bots to common owner</div>
+        <div className="swap-off">🤖 Display bots individually</div>
+      </label>
+
       <div className="flex flex-col gap-2 items-stretch w-full mb-2">
         <h2 className="font-bold text-3xl self-center">Daily Revenue</h2>
         <DailyChart
@@ -113,6 +127,7 @@ export default function Index() {
           setStartDate={setStartDate}
           endDate={endDate}
           setEndDate={setEndDate}
+          combine={combine}
         />
       </div>
       <div className="flex flex-col gap-2 items-stretch w-full mb-2">
@@ -124,6 +139,7 @@ export default function Index() {
           setStartDate={setStartDate}
           endDate={endDate}
           setEndDate={setEndDate}
+          combine={combine}
         />
       </div>
     </div>

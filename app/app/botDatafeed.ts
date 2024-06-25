@@ -2,7 +2,7 @@ import dayjs from 'dayjs';
 
 import { DailyGasStats, DailyProfitStats } from '../../api/src';
 
-import { allBots } from './config';
+import { allBotOwners, allBots } from './config';
 
 import { client } from '~/api';
 import { ChartData } from '~/types';
@@ -36,11 +36,13 @@ export class BotDatafeed {
   public async getData({
     botIds,
     startDate,
-    endDate
+    endDate,
+    combine
   }: {
     botIds: string[];
     startDate: dayjs.Dayjs;
     endDate: dayjs.Dayjs;
+    combine?: boolean;
   }): Promise<DatafeedResponse> {
     if (startDate.isBefore(earliestDate)) {
       startDate = earliestDate.clone();
@@ -49,17 +51,17 @@ export class BotDatafeed {
     const { profits: profitsData, gas: gasData } = await this.updateData({
       botIds,
       startDate,
-      endDate
+      endDate,
+      combine
     });
 
-    const profits = Object.fromEntries(
-      Object.entries(profitsData).filter(([botId]) => botIds.includes(botId))
-    );
-    const gas = Object.fromEntries(
-      Object.entries(gasData).filter(([botId]) => botIds.includes(botId))
+    const profits = Object.fromEntries(Object.entries(profitsData));
+    const gas = Object.fromEntries(Object.entries(gasData));
+    const filteredBotIds = Array.from(
+      new Set([...Object.keys(gas), ...Object.keys(profits)])
     );
     const chartData = Object.fromEntries(
-      botIds.map(botId => [
+      filteredBotIds.map(botId => [
         botId,
         gas[botId]?.map(({ date, nearBurnt }, index) => ({
           time: date,
@@ -71,20 +73,25 @@ export class BotDatafeed {
     );
 
     return Object.values(chartData ?? {}).map((data, index) => ({
-      botId: botIds[index],
+      botId: filteredBotIds[index],
       chartData: data ?? [],
-      color: allBots.find(bot => bot.value === botIds[index])?.color ?? ''
+      color:
+        allBots.find(bot => bot.value === filteredBotIds[index])?.color ??
+        allBotOwners.find(bot => bot.value === filteredBotIds[index])?.color ??
+        '#000'
     }));
   }
 
   private async updateData({
     botIds,
     startDate,
-    endDate
+    endDate,
+    combine
   }: {
     botIds: string[];
     startDate: dayjs.Dayjs;
     endDate: dayjs.Dayjs;
+    combine?: boolean;
   }): Promise<{
     profits: Record<string, DailyProfitStats[] | undefined>;
     gas: Record<string, DailyGasStats[] | undefined>;
@@ -221,7 +228,7 @@ export class BotDatafeed {
       await profitsPromise;
       await gasPromise;
 
-      const profits = Object.fromEntries(
+      const profits: Record<string, DailyProfitStats[]> = Object.fromEntries(
         botIds.map(botId => {
           let current = startDate.clone();
           const res = [];
@@ -233,8 +240,38 @@ export class BotDatafeed {
           return [botId, res] as const;
         })
       );
+      if (combine) {
+        for (const botOwner of allBotOwners) {
+          const bots = botOwner.bots.filter(botId => botIds.includes(botId));
+          for (const botId of bots) {
+            delete profits[botId];
+          }
+          if (bots.length > 0) {
+            let current = startDate.clone();
+            const res = [];
+            while (current.isBefore(now) && current.isBefore(endDate)) {
+              const currentDate = current.format('YYYY-MM-DD');
+              const combinedProfits = bots.reduce(
+                (acc, botId) =>
+                  acc +
+                  (Number(
+                    this.profitsCache[botId]?.[currentDate].profitsNear
+                  ) ?? 0),
+                0
+              );
+              const value = {
+                ...this.profitsCache[bots[0]]![currentDate]
+              };
+              value.profitsNear = String(combinedProfits);
+              res.push(value);
+              current = current.add(1, 'day');
+            }
+            profits[botOwner.value] = res;
+          }
+        }
+      }
 
-      const gas = Object.fromEntries(
+      const gas: Record<string, DailyGasStats[]> = Object.fromEntries(
         botIds.map(botId => {
           let current = startDate.clone();
           const res = [];
@@ -246,6 +283,32 @@ export class BotDatafeed {
           return [botId, res] as const;
         })
       );
+      if (combine) {
+        for (const botOwner of allBotOwners) {
+          const bots = botOwner.bots.filter(botId => botIds.includes(botId));
+          for (const botId of bots) {
+            delete gas[botId];
+          }
+          if (bots.length > 0) {
+            let current = startDate.clone();
+            const res = [];
+            while (current.isBefore(now) && current.isBefore(endDate)) {
+              const currentDate = current.format('YYYY-MM-DD');
+              const combinedNearBurnt = bots.reduce(
+                (acc, botId) =>
+                  acc +
+                  (Number(this.gasCache[botId]?.[currentDate].nearBurnt) ?? 0),
+                0
+              );
+              const value = { ...this.gasCache[bots[0]]![currentDate] };
+              value.nearBurnt = String(combinedNearBurnt);
+              res.push(value);
+              current = current.add(1, 'day');
+            }
+            gas[botOwner.value] = res;
+          }
+        }
+      }
 
       return { profits, gas };
     } catch (err) {
