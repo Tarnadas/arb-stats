@@ -1,3 +1,4 @@
+import chroma from 'chroma-js';
 import dayjs from 'dayjs';
 import { createChart } from 'lightweight-charts';
 import {
@@ -9,9 +10,10 @@ import {
   useState
 } from 'react';
 
-import { BotDatafeed } from '~/botDatafeed';
+import { BotDatafeed, priceFormatter } from '~/botDatafeed';
+import { ChartData } from '~/types';
 
-export const Chart: FC<{
+export const CumulativeChart: FC<{
   botIds: string[];
   botDatafeed: BotDatafeed;
   startDate: dayjs.Dayjs;
@@ -29,7 +31,7 @@ export const Chart: FC<{
   const [loading, setLoading] = useState(false);
   const offsets = useRef<[number, number]>([0, 0]);
   const series = useRef<
-    Record<string, ReturnType<ReturnType<typeof createChart>['addLineSeries']>>
+    Record<string, ReturnType<ReturnType<typeof createChart>['addAreaSeries']>>
   >({});
   const chartContainerRef = useRef<HTMLDivElement>(null);
 
@@ -49,6 +51,11 @@ export const Chart: FC<{
       width: chartContainerRef.current.clientWidth,
       height: 300
     });
+    chart.applyOptions({
+      localization: {
+        priceFormatter
+      }
+    });
 
     setLoading(true);
     botDatafeed
@@ -59,10 +66,22 @@ export const Chart: FC<{
       })
       .then(datafeed => {
         for (const { botId, chartData, color } of datafeed) {
-          series.current[botId] = chart.addLineSeries({
-            color
+          series.current[botId] = chart.addAreaSeries({
+            lineColor: color,
+            topColor: chroma(color).alpha(0.4).hex(),
+            bottomColor: chroma(color).alpha(0).hex()
           });
-          series.current[botId].setData(chartData ?? []);
+          const convertedChartData: ChartData[] = [];
+          let cumulated = 0;
+          let index = 0;
+          for (const data of chartData) {
+            cumulated += data.value;
+            convertedChartData[index++] = {
+              value: cumulated,
+              time: data.time
+            };
+          }
+          series.current[botId].setData(convertedChartData ?? []);
         }
         chart.timeScale().fitContent();
         setLoading(false);
@@ -103,7 +122,17 @@ export const Chart: FC<{
                 })
                 .then(datafeed => {
                   for (const { botId, chartData } of datafeed) {
-                    series.current[botId].setData(chartData ?? []);
+                    const convertedChartData: ChartData[] = [];
+                    let cumulated = 0;
+                    let index = 0;
+                    for (const data of chartData) {
+                      cumulated += data.value;
+                      convertedChartData[index++] = {
+                        value: cumulated,
+                        time: data.time
+                      };
+                    }
+                    series.current[botId].setData(convertedChartData ?? []);
                   }
                   offsets.current = [0, 0];
                 });

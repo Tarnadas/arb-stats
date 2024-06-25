@@ -1,1 +1,1 @@
-export * from './chart';
+export * from './dailyChart';

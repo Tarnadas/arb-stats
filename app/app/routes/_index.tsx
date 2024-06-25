@@ -5,7 +5,8 @@ import { useMemo, useState } from 'react';
 import Select, { StylesConfig } from 'react-select';
 
 import { BotDatafeed } from '~/botDatafeed';
-import { Chart } from '~/components';
+import { DailyChart } from '~/components';
+import { CumulativeChart } from '~/components/cumulativeChart';
 import { BotOption, allBots } from '~/config';
 
 export const meta: MetaFunction = () => {
@@ -86,7 +87,7 @@ export default function Index() {
   );
 
   return (
-    <div className="flex flex-col items-center gap-4 p-4 max-w-4xl m-auto">
+    <div className="flex flex-col items-center gap-6 p-4 max-w-4xl m-auto">
       <h1 className="font-bold text-4xl self-center mb-4">
         Near Arbitrage Statistics
       </h1>
@@ -103,14 +104,28 @@ export default function Index() {
         }}
         closeMenuOnSelect={false}
       />
-      <Chart
-        botIds={botIds}
-        botDatafeed={botDatafeed}
-        startDate={startDate}
-        setStartDate={setStartDate}
-        endDate={endDate}
-        setEndDate={setEndDate}
-      ></Chart>
+      <div className="flex flex-col gap-2 items-stretch w-full mb-2">
+        <h2 className="font-bold text-3xl self-center">Daily Revenue</h2>
+        <DailyChart
+          botIds={botIds}
+          botDatafeed={botDatafeed}
+          startDate={startDate}
+          setStartDate={setStartDate}
+          endDate={endDate}
+          setEndDate={setEndDate}
+        />
+      </div>
+      <div className="flex flex-col gap-2 items-stretch w-full mb-2">
+        <h2 className="font-bold text-3xl self-center">Cumulative Revenue</h2>
+        <CumulativeChart
+          botIds={botIds}
+          botDatafeed={botDatafeed}
+          startDate={startDate}
+          setStartDate={setStartDate}
+          endDate={endDate}
+          setEndDate={setEndDate}
+        />
+      </div>
     </div>
   );
 }

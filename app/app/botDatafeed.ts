@@ -13,7 +13,13 @@ export type DatafeedResponse = {
   color: string;
 }[];
 
-const earliestDate = dayjs('2024-04-16');
+const earliestDate = dayjs('2024-03-16');
+
+export const priceFormatter = (value: number) =>
+  `${Intl.NumberFormat('en-US', {
+    maximumFractionDigits: 2,
+    minimumIntegerDigits: 1
+  }).format(value)} NEAR`;
 
 export class BotDatafeed {
   private profitsCache: Record<

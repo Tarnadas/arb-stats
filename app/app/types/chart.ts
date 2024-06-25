@@ -1,3 +1,3 @@
-import { LineData, Time, WhitespaceData } from 'lightweight-charts';
+import { LineData, Time } from 'lightweight-charts';
 
-export type ChartData = LineData<Time> | WhitespaceData<Time>;
+export type ChartData = LineData<Time>;
