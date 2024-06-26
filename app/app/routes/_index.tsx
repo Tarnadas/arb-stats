@@ -155,9 +155,7 @@ export default function Index() {
           botIds={botIds}
           botDatafeed={botDatafeed}
           startDate={startDate}
-          setStartDate={setStartDate}
           endDate={endDate}
-          setEndDate={setEndDate}
           combine={combine}
         />
       </div>
@@ -167,9 +165,7 @@ export default function Index() {
           botIds={botIds}
           botDatafeed={botDatafeed}
           startDate={startDate}
-          setStartDate={setStartDate}
           endDate={endDate}
-          setEndDate={setEndDate}
           combine={combine}
         />
       </div>
@@ -201,9 +197,7 @@ export default function Index() {
           botIds={botIds}
           botDatafeed={botDatafeed}
           startDate={startDate}
-          setStartDate={setStartDate}
           endDate={endDate}
-          setEndDate={setEndDate}
           combine={combine}
           movingAverageSize={movingAverageSize}
         />

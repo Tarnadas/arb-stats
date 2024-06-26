@@ -1,13 +1,6 @@
 import dayjs from 'dayjs';
 import { createChart } from 'lightweight-charts';
-import {
-  Dispatch,
-  FC,
-  SetStateAction,
-  useEffect,
-  useRef,
-  useState
-} from 'react';
+import { FC, useEffect, useRef, useState } from 'react';
 
 import { BotDatafeed, priceFormatter } from '~/botDatafeed';
 
@@ -15,19 +8,9 @@ export const DailyChart: FC<{
   botIds: string[];
   botDatafeed: BotDatafeed;
   startDate: dayjs.Dayjs;
-  setStartDate: Dispatch<SetStateAction<dayjs.Dayjs>>;
   endDate: dayjs.Dayjs;
-  setEndDate: Dispatch<SetStateAction<dayjs.Dayjs>>;
   combine: boolean;
-}> = ({
-  botIds,
-  botDatafeed,
-  startDate,
-  setStartDate,
-  endDate,
-  setEndDate,
-  combine
-}) => {
+}> = ({ botIds, botDatafeed, startDate, endDate, combine }) => {
   const [loading, setLoading] = useState(false);
   const offsets = useRef<[number, number]>([0, 0]);
   const series = useRef<
@@ -97,12 +80,10 @@ export const DailyChart: FC<{
               const startOffset = Math.round(newOffsets[0]);
               if (startOffset < 0) {
                 currentStartDate = currentStartDate.add(startOffset, 'days');
-                setStartDate(currentStartDate);
               }
               const endOffset = Math.round(newOffsets[1]);
               if (endOffset > 0) {
                 currentEndDate = currentEndDate.add(endOffset, 'days');
-                setEndDate(currentEndDate);
               }
               botDatafeed
                 .getData({
@@ -129,8 +110,7 @@ export const DailyChart: FC<{
 
       chart.remove();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [botIds, botDatafeed, combine]);
+  }, [botIds, botDatafeed, startDate, endDate, combine]);
 
   return (
     <>

@@ -234,7 +234,10 @@ export class BotDatafeed {
         botIds.map(botId => {
           let current = startDate.clone();
           const res = [];
-          while (current.isBefore(now) && current.isBefore(endDate)) {
+          while (
+            current.isBefore(now) &&
+            current.isBefore(endDate.add(1, 'day'))
+          ) {
             const currentDate = current.format('YYYY-MM-DD');
             res.push(this.profitsCache[botId]![currentDate]);
             current = current.add(1, 'day');
@@ -251,7 +254,10 @@ export class BotDatafeed {
           if (bots.length > 0) {
             let current = startDate.clone();
             const res = [];
-            while (current.isBefore(now) && current.isBefore(endDate)) {
+            while (
+              current.isBefore(now) &&
+              current.isBefore(endDate.add(1, 'day'))
+            ) {
               const currentDate = current.format('YYYY-MM-DD');
               const combinedProfits = bots.reduce(
                 (acc, botId) =>
@@ -277,7 +283,10 @@ export class BotDatafeed {
         botIds.map(botId => {
           let current = startDate.clone();
           const res = [];
-          while (current.isBefore(now) && current.isBefore(endDate)) {
+          while (
+            current.isBefore(now) &&
+            current.isBefore(endDate.add(1, 'day'))
+          ) {
             const currentDate = current.format('YYYY-MM-DD');
             res.push(this.gasCache[botId]![currentDate]);
             current = current.add(1, 'day');
@@ -294,7 +303,10 @@ export class BotDatafeed {
           if (bots.length > 0) {
             let current = startDate.clone();
             const res = [];
-            while (current.isBefore(now) && current.isBefore(endDate)) {
+            while (
+              current.isBefore(now) &&
+              current.isBefore(endDate.add(1, 'day'))
+            ) {
               const currentDate = current.format('YYYY-MM-DD');
               const combinedNearBurnt = bots.reduce(
                 (acc, botId) =>

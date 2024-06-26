@@ -1,13 +1,6 @@
 import dayjs from 'dayjs';
 import { LineType, createChart } from 'lightweight-charts';
-import {
-  Dispatch,
-  FC,
-  SetStateAction,
-  useEffect,
-  useRef,
-  useState
-} from 'react';
+import { FC, useEffect, useRef, useState } from 'react';
 
 import { BotDatafeed } from '~/botDatafeed';
 import { ChartData } from '~/types';
@@ -16,18 +9,14 @@ export const MarketShareChart: FC<{
   botIds: string[];
   botDatafeed: BotDatafeed;
   startDate: dayjs.Dayjs;
-  setStartDate: Dispatch<SetStateAction<dayjs.Dayjs>>;
   endDate: dayjs.Dayjs;
-  setEndDate: Dispatch<SetStateAction<dayjs.Dayjs>>;
   combine: boolean;
   movingAverageSize: number;
 }> = ({
   botIds,
   botDatafeed,
   startDate,
-  setStartDate,
   endDate,
-  setEndDate,
   combine,
   movingAverageSize
 }) => {
@@ -136,12 +125,10 @@ export const MarketShareChart: FC<{
               const startOffset = Math.round(newOffsets[0]);
               if (startOffset < 0) {
                 currentStartDate = currentStartDate.add(startOffset, 'days');
-                setStartDate(currentStartDate);
               }
               const endOffset = Math.round(newOffsets[1]);
               if (endOffset > 0) {
                 currentEndDate = currentEndDate.add(endOffset, 'days');
-                setEndDate(currentEndDate);
               }
               botDatafeed
                 .getData({
@@ -204,8 +191,7 @@ export const MarketShareChart: FC<{
 
       chart.remove();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [botIds, botDatafeed, combine, movingAverageSize]);
+  }, [botIds, botDatafeed, startDate, endDate, combine, movingAverageSize]);
 
   return (
     <>
