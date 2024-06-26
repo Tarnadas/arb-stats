@@ -96,11 +96,11 @@ export const allBots = [
     label: 'shitake.near',
     color: chroma(aldorColor).darken(2).saturate(2).hex()
   },
-  {
-    value: 'drooling.near',
-    label: 'drooling.near',
-    color: chroma(aldorColor).darken(2).saturate(2).hex()
-  },
+  // {
+  //   value: 'drooling.near',
+  //   label: 'drooling.near',
+  //   color: chroma(aldorColor).darken(2).saturate(2).hex()
+  // },
   {
     value: 'foxboss.near',
     label: 'foxboss.near',
