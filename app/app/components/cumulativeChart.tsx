@@ -4,6 +4,7 @@ import { createChart } from 'lightweight-charts';
 import { FC, useEffect, useRef, useState } from 'react';
 
 import { BotDatafeed, priceFormatter } from '~/botDatafeed';
+import { allBotOwners, allBots } from '~/config';
 import { ChartData } from '~/types';
 
 export const CumulativeChart: FC<{
@@ -39,6 +40,81 @@ export const CumulativeChart: FC<{
     chart.applyOptions({
       localization: {
         priceFormatter
+      },
+      crosshair: {
+        horzLine: {
+          visible: false,
+          labelVisible: false
+        },
+        vertLine: {
+          labelVisible: false
+        }
+      }
+    });
+
+    const toolTip = document.createElement('div');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (toolTip as any).style =
+      `position: absolute; display: none; padding: 8px; box-sizing: border-box; font-size: 12px; text-align: left; z-index: 1000; top: 12px; left: 12px; pointer-events: none; border: 1px solid; border-radius: 2px;font-family: -apple-system, BlinkMacSystemFont, 'Trebuchet MS', Roboto, Ubuntu, sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; flex-direction: column; max-height: 284px; flex-wrap: wrap; gap: 0 0.6rem;`;
+    toolTip.style.background = '#eee';
+    toolTip.style.color = 'black';
+    toolTip.style.borderColor = '#333';
+    chartContainerRef.current.appendChild(toolTip);
+
+    // update tooltip
+    chart.subscribeCrosshairMove(param => {
+      if (
+        param.point === undefined ||
+        !param.time ||
+        param.point.x < 0 ||
+        param.point.x > chartContainerRef.current!.clientWidth ||
+        param.point.y < 0 ||
+        param.point.y > chartContainerRef.current!.clientHeight
+      ) {
+        toolTip.style.display = 'none';
+      } else {
+        const dateStr = param.time;
+        toolTip.style.display = 'flex';
+
+        const format = new Intl.NumberFormat('en-US', {
+          compactDisplay: 'short',
+          maximumFractionDigits: 2
+        }).format;
+        let filteredBotIds: string[];
+        if (combine) {
+          filteredBotIds = Array.from(
+            new Set(
+              botIds.map(
+                botId =>
+                  allBotOwners.find(bot => bot.bots.includes(botId))?.value ??
+                  botId
+              )
+            )
+          );
+        } else {
+          filteredBotIds = botIds;
+        }
+        const innerHTML =
+          filteredBotIds.reduce((html, botId) => {
+            const data = param.seriesData.get(
+              series.current[botId]
+            ) as ChartData;
+            const color =
+              allBots.find(bot => bot.value === botId)?.color ??
+              allBotOwners.find(bot => bot.value === botId)?.color ??
+              '#000';
+            return (
+              html +
+              `<div style="border-bottom: 1px dashed gray;"><div style="color: ${color}; font-weight: 600">${botId}</div><div style="font-size: 1.15rem; ">
+            ${format(data.value)}
+            </div></div>`
+            );
+          }, '') +
+          `<div>
+            ${dateStr}
+            </div>`;
+
+        toolTip.innerHTML = innerHTML;
       }
     });
 
