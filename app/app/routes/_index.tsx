@@ -136,7 +136,7 @@ export default function Index() {
         }}
         closeMenuOnSelect={false}
       />
-      <label className="swap text-xl">
+      <label className="swap text-xl self-start">
         <input
           type="checkbox"
           checked={combine}
@@ -147,6 +147,27 @@ export default function Index() {
 
         <div className="swap-on">👨 Combine bots to common owner</div>
         <div className="swap-off">🤖 Display bots individually</div>
+      </label>
+      <label className="swap text-xl self-start">
+        <input
+          type="checkbox"
+          onClick={() => {
+            if (botIds.length === allBots.length) {
+              setBotIdValues([]);
+            } else {
+              setBotIdValues(allBots);
+            }
+          }}
+        />
+
+        <div>
+          {botIds.length === allBots.length
+            ? '👪'
+            : botIds.length === 0
+              ? '🫥'
+              : '⚪️'}{' '}
+          Toggle all
+        </div>
       </label>
 
       <div className="flex flex-col gap-2 items-stretch w-full mb-2">
