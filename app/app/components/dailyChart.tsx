@@ -94,21 +94,31 @@ export const DailyChart: FC<{
           filteredBotIds = botIds;
         }
         const innerHTML =
-          filteredBotIds.reduce((html, botId) => {
-            const data = param.seriesData.get(
-              series.current[botId]
-            ) as ChartData;
-            const color =
-              allBots.find(bot => bot.value === botId)?.color ??
-              allBotOwners.find(bot => bot.value === botId)?.color ??
-              '#000';
-            return (
-              html +
-              `<div style="border-bottom: 1px dashed gray;"><div style="color: ${color}; font-weight: 600">${botId}</div><div style="font-size: 1.15rem; ">
+          filteredBotIds
+            .sort((botIdA, botIdB) => {
+              const dataA = param.seriesData.get(
+                series.current[botIdA]
+              ) as ChartData;
+              const dataB = param.seriesData.get(
+                series.current[botIdB]
+              ) as ChartData;
+              return dataB.value - dataA.value;
+            })
+            .reduce((html, botId) => {
+              const data = param.seriesData.get(
+                series.current[botId]
+              ) as ChartData;
+              const color =
+                allBots.find(bot => bot.value === botId)?.color ??
+                allBotOwners.find(bot => bot.value === botId)?.color ??
+                '#000';
+              return (
+                html +
+                `<div style="border-bottom: 1px dashed gray;"><div style="color: ${color}; font-weight: 600">${botId}</div><div style="font-size: 1.15rem; ">
             ${format(data.value)}
             </div></div>`
-            );
-          }, '') +
+              );
+            }, '') +
           `<div>
             ${dateStr}
             </div>`;
