@@ -2,6 +2,7 @@ import chroma from 'chroma-js';
 
 export const marioColor = '#b90000';
 export const aldorColor = '#0044b9';
+export const brayoColor = '#00b900';
 
 export const allBotOwners = [
   {
@@ -31,6 +32,12 @@ export const allBotOwners = [
       'shitake.near',
       'drooling.near'
     ]
+  },
+  {
+    value: 'brayo.near',
+    label: 'brayo.near',
+    color: brayoColor,
+    bots: ['arb.brayo.near']
   }
 ];
 
@@ -96,17 +103,13 @@ export const allBots = [
     label: 'shitake.near',
     color: chroma(aldorColor).darken(2).saturate(2).hex()
   },
-  // {
-  //   value: 'drooling.near',
-  //   label: 'drooling.near',
-  //   color: chroma(aldorColor).darken(2).saturate(2).hex()
-  // },
   {
     value: 'foxboss.near',
     label: 'foxboss.near',
     color: '#000'
   },
-  { value: 'xy_k.near', label: 'xy_k.near', color: '#000' }
+  { value: 'xy_k.near', label: 'xy_k.near', color: '#000' },
+  { value: 'arb.brayo.near', label: 'arb.brayo.near', color: brayoColor }
 ];
 
 export type BotOption = (typeof allBots)[0];

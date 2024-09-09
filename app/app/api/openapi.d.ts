@@ -56,7 +56,8 @@ export interface paths {
             | 'shitake.near'
             | 'drooling.near'
             | 'foxboss.near'
-            | 'xy_k.near';
+            | 'xy_k.near'
+            | 'arb.brayo.near';
         };
       };
       responses: {
@@ -110,7 +111,8 @@ export interface paths {
             | 'shitake.near'
             | 'drooling.near'
             | 'foxboss.near'
-            | 'xy_k.near';
+            | 'xy_k.near'
+            | 'arb.brayo.near';
         };
       };
       responses: {
@@ -168,7 +170,8 @@ export interface paths {
             | 'shitake.near'
             | 'drooling.near'
             | 'foxboss.near'
-            | 'xy_k.near';
+            | 'xy_k.near'
+            | 'arb.brayo.near';
         };
       };
       responses: {

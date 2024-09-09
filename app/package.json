@@ -10,7 +10,7 @@
     "dev": "remix vite:dev",
     "start": "wrangler dev ./server.js",
     "typegen": "wrangler types",
-    "api-gen": "openapi-typescript ./app/api/openapi.json -o ./app/api/openapi.d.ts"
+    "api-gen": "openapi-typescript https://arb-stats.shitzuapes.xyz/doc -o ./app/api/openapi.d.ts"
   },
   "dependencies": {
     "@cloudflare/kv-asset-handler": "^0.3.3",
