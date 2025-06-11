@@ -41,7 +41,8 @@ const botIds = z.enum([
   'shitake.near',
   'drooling.near',
   'foxboss.near',
-  'xy_k.near'
+  'xy_k.near',
+  'arb.brayo.near'
 ]);
 
 export const bots = new OpenAPIHono();
