@@ -4,8 +4,8 @@ use async_stream::stream;
 use futures_util::future::{join_all, try_join_all};
 use itertools::Itertools;
 use near_jsonrpc_client::{
-    methods::{self, chunk::ChunkReference, tx::TransactionInfo},
     JsonRpcClient,
+    methods::{self, chunk::ChunkReference, tx::TransactionInfo},
 };
 use near_primitives::{
     types::{AccountId, BlockHeight, BlockId, BlockReference},
@@ -15,8 +15,8 @@ use near_token::NearToken;
 use rayon::prelude::*;
 use regex::Regex;
 use reqwest::{
-    header::{HeaderMap, AUTHORIZATION},
     Client, Url,
+    header::{AUTHORIZATION, HeaderMap},
 };
 use serde::Deserialize;
 use std::{env, str::FromStr, time::Duration};
@@ -106,15 +106,11 @@ pub async fn poll_block<'a>(
                         .enumerate()
                     {
                         let block_results: Vec<_> = join_all(chunk.map(|block_height| async move {
-                            let block = match fallback_rpc_client
+                            let block = (fallback_rpc_client
                                 .call(methods::block::RpcBlockRequest {
                                     block_reference: BlockReference::BlockId(BlockId::Height(block_height)),
                                 })
-                                .await
-                            {
-                                Ok(block) => Some(block),
-                                Err(_) => None,
-                            };
+                                .await).ok();
                             match block {
                                 Some(block) => {
                                     let timestamp = block.header.timestamp_nanosec;

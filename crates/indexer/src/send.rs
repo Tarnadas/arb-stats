@@ -1,10 +1,10 @@
 use crate::ArbEvent;
 use anyhow::Result;
-use futures_util::{pin_mut, StreamExt};
+use futures_util::{StreamExt, pin_mut};
 use near_primitives::types::BlockHeight;
 use reqwest::{
-    header::{HeaderMap, AUTHORIZATION},
     Client, Url,
+    header::{AUTHORIZATION, HeaderMap},
 };
 use serde::Serialize;
 use std::env;
@@ -42,10 +42,10 @@ pub async fn send_data(
         batch_event.push(block_event);
 
         if block_height - last_block_height >= max_block_height_diff {
-            println!("block_height: {}", block_height);
+            println!("block_height: {block_height}");
             let event_size = batch_event.iter().map(|ev| ev.events.len()).sum::<usize>();
             if event_size > 0 {
-                println!("found events: {}", event_size);
+                println!("found events: {event_size}");
             }
             last_block_height = block_height;
             match client
